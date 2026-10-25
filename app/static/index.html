@@ -50,6 +50,14 @@ li.done .chk{background:var(--oxide);border-color:var(--oxide)}
 .del{background:none;border:0;color:var(--muted);font-size:14px;padding:2px 4px;opacity:.5}
 .del:hover{opacity:1;color:var(--oxide)}
 .empty{color:var(--muted);padding:20px 0;font-size:14px}
+.tools{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 32px)}
+.tools p{margin:0;background:var(--paper);border:1px solid var(--ink);padding:7px 10px;font-size:12px}
+.solid,.ghost{border:1px solid var(--ink);padding:9px 14px;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.solid{background:var(--ink);color:var(--paper)}.solid:hover,.solid[aria-pressed=true]{background:var(--oxide);border-color:var(--oxide)}
+.ghost{background:var(--paper);color:var(--ink)}.ghost:hover{background:var(--ink);color:var(--paper)}
+body.arranging .tag{display:none}
+body.arranging #status{display:none}
+body.inroom .tools{display:none}
 </style>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
@@ -61,6 +69,7 @@ li.done .chk{background:var(--oxide);border-color:var(--oxide)}
   <div class="filters"><button data-f="todo" aria-pressed="true">To do</button><button data-f="done" aria-pressed="false">Done</button><button data-f="all" aria-pressed="false">All</button></div>
   <ul id="list"></ul>
 </aside>
+<div class="tools"><p id="hint" hidden>Drag a piece to move it. Tap it to turn it.</p><button id="reset" class="ghost" hidden>Reset layout</button><button id="arrange" class="solid" aria-pressed="false">Arrange</button></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const ROOMS=[
@@ -140,19 +149,27 @@ function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta)
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();tDist=cur?7.5:(w<600?20:16)}
 addEventListener("resize",resize);resize();dist=tDist;
 
-let drag=null,moved=0;
+let drag=null,moved=0,arrange=false,grab=null,hovPiece=null;
 const ray=new THREE.Raycaster(),v2=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();
 function aim(e){v2.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);ray.setFromCamera(v2,camera)}
 function pick(e){aim(e);const h=ray.intersectObjects(picks)[0];return h&&h.object.userData.room}
+function pickPiece(e){aim(e);const h=ray.intersectObjects(PIECES,true)[0];if(!h)return null;let o=h.object;while(o&&!o.userData.piece)o=o.parent;return o}
 canvas.addEventListener("pointerdown",e=>{moved=0;canvas.setPointerCapture(e.pointerId);
+  if(arrange){const p=pickPiece(e);if(p){plane.constant=-p.position.y;aim(e);ray.ray.intersectPlane(plane,hit);grab={p,dx:p.position.x-hit.x,dz:p.position.z-hit.z};return}}
   drag={x:e.clientX,y:e.clientY}});
 canvas.addEventListener("pointermove",e=>{
+  if(grab){moved+=Math.abs(e.movementX)+Math.abs(e.movementY);aim(e);if(ray.ray.intersectPlane(plane,hit)){const t=grab.p.userData.t;setPiece(grab.p,hit.x+grab.dx,hit.z+grab.dz,t[3])}return}
   if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;phi=Math.min(1.35,Math.max(.35,phi-dy*.006));drag={x:e.clientX,y:e.clientY}}
   else hover(e)});
 canvas.addEventListener("pointerup",e=>{
-  if(moved<6){const r=pick(e);if(r)openRoom(r.id);else if(cur)closeRoom()}drag=null});
+  if(grab){const p=grab.p,t=p.userData.t;if(moved<6)setPiece(p,t[0],t[2],t[3]+Math.PI/4);savePiece(p);grab=null;return}
+  if(moved<6&&!arrange){const r=pick(e);if(r)openRoom(r.id);else if(cur)closeRoom()}drag=null});
 canvas.addEventListener("wheel",e=>{tDist=Math.min(24,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
-let hov=null;function hover(e){hov=pick(e);canvas.style.cursor=hov?"pointer":"grab"}
+let hov=null;function hover(e){if(arrange){hovPiece=pickPiece(e);hov=null;canvas.style.cursor=hovPiece?"move":"grab";return}hovPiece=null;hov=pick(e);canvas.style.cursor=hov?"pointer":"grab"}
+async function savePiece(p){if(!db)return;const t=p.userData.t;try{await api("PUT","/api/layout/"+p.userData.piece,{x:+t[0].toFixed(3),z:+t[2].toFixed(3),r:+t[3].toFixed(4)})}catch(e){status("Couldn't save the new layout.")}}
+const arrBtn=$("#arrange"),resetBtn=$("#reset");
+arrBtn.onclick=()=>{arrange=!arrange;if(arrange&&cur)closeRoom();arrBtn.setAttribute("aria-pressed",arrange);arrBtn.textContent=arrange?"Done":"Arrange";$("#hint").hidden=!arrange;resetBtn.hidden=!arrange;document.body.classList.toggle("arranging",arrange)};
+resetBtn.onclick=async()=>{PIECES.forEach(p=>{const h=p.userData.home;setPiece(p,h[0],h[1],0)});if(db)try{await api("DELETE","/api/layout")}catch(e){}};
 
 const tags=$("#tags");
 ROOMS.forEach(r=>{const b=document.createElement("button");b.className="tag";b.onclick=()=>openRoom(r.id);tags.appendChild(b);r.tag=b});
@@ -162,8 +179,8 @@ function loop(t){
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
   ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
     tmp.set(r.x*2,r.y+1.9,r.z*2).project(camera);r.tag.style.left=(tmp.x*.5+.5)*innerWidth+"px";r.tag.style.top=(-tmp.y*.5+.5)*innerHeight+"px";r.tag.hidden=!!cur||tmp.z>1});
-  PIECES.forEach(p=>{const q=p.userData.t;
-    p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
+  PIECES.forEach(p=>{const q=p.userData.t,lift=(grab&&grab.p===p)?.25:(hovPiece===p?.08:0);
+    p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]+lift-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
   renderer.render(scene,camera);requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
