@@ -12,16 +12,18 @@ import sqlite3
 import time
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import Cookie, FastAPI, HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
 PASSWORD = os.environ.get("HOUSE_PASSWORD", "change-me")
 SECRET = os.environ.get("HOUSE_SECRET") or secrets.token_hex(32)  # set it in production so logins survive restarts
 COOKIE = "house_session"
 COOKIE_DAYS = 180
+
+Room = Literal["movies", "food", "dates", "trips"]
 
 SEED_ITEMS = [
     ("movies", "Tekkonkinkreet (2006)", True, True),
@@ -121,6 +123,11 @@ class Login(BaseModel):
     password: str
 
 
+class NewItem(BaseModel):
+    room: Room
+    text: str = Field(min_length=1, max_length=200)
+
+
 # ---------- routes ----------
 @app.post("/api/login")
 def login(body: Login, response: Response):
@@ -136,6 +143,30 @@ def login(body: Login, response: Response):
 def me(house_session: Optional[str] = Cookie(None)):
     require(house_session)
     return {"ok": True}
+
+
+@app.get("/api/state")
+def state(house_session: Optional[str] = Cookie(None)):
+    require(house_session)
+    return snapshot()
+
+
+@app.post("/api/items", status_code=201)
+async def add_item(body: NewItem, house_session: Optional[str] = Cookie(None)):
+    require(house_session)
+    item_id = "i" + secrets.token_hex(6)
+    with db() as con:
+        con.execute("INSERT INTO items(id,room,text,ts) VALUES(?,?,?,?)",
+                    (item_id, body.room, body.text.strip(), int(time.time() * 1000)))
+    return {"id": item_id}
+
+
+@app.delete("/api/items/{item_id}", status_code=204)
+async def delete_item(item_id: str, house_session: Optional[str] = Cookie(None)):
+    require(house_session)
+    with db() as con:
+        con.execute("DELETE FROM items WHERE id=?", (item_id,))
+    return Response(status_code=204)
 
 
 @app.get("/healthz")
