@@ -50,6 +50,7 @@ li.done .chk{background:var(--oxide);border-color:var(--oxide)}
 .del{background:none;border:0;color:var(--muted);font-size:14px;padding:2px 4px;opacity:.5}
 .del:hover{opacity:1;color:var(--oxide)}
 .empty{color:var(--muted);padding:20px 0;font-size:14px}
+#status{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));color:var(--muted);font-size:12px;max-width:70%}
 .tools{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 32px)}
 .tools p{margin:0;background:var(--paper);border:1px solid var(--ink);padding:7px 10px;font-size:12px}
 .solid,.ghost{border:1px solid var(--ink);padding:9px 14px;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
@@ -69,6 +70,7 @@ body.inroom .tools{display:none}
   <div class="filters"><button data-f="todo" aria-pressed="true">To do</button><button data-f="done" aria-pressed="false">Done</button><button data-f="all" aria-pressed="false">All</button></div>
   <ul id="list"></ul>
 </aside>
+<div id="status">Connecting to your shared lists…</div>
 <div class="tools"><p id="hint" hidden>Drag a piece to move it. Tap it to turn it.</p><button id="reset" class="ghost" hidden>Reset layout</button><button id="arrange" class="solid" aria-pressed="false">Arrange</button></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -195,7 +197,7 @@ document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.
 function render(){updTags();if(!cur)return;const ul=$("#list");ul.innerHTML="";
   let rows=items.filter(i=>i.room===cur&&(filter==="all"||(filter==="done")===!!i.done));
   rows.sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(b.ts||0)-(a.ts||0));
-  if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above.");ul.appendChild(e);return}
+  if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=db?(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above."):"Sign in to see your lists.";ul.appendChild(e);return}
   rows.forEach(i=>{const li=document.createElement("li");if(i.done)li.className="done";
     const c=document.createElement("button");c.className="chk";c.textContent=i.done?"✓":"";c.setAttribute("aria-label",i.done?"Mark as not done":"Mark as done");c.onclick=()=>save(i.id,{done:!i.done,doneAt:i.done?null:Date.now()});
     const t=document.createElement("span");t.className="t";t.textContent=i.text;
@@ -203,15 +205,26 @@ function render(){updTags();if(!cur)return;const ul=$("#list");ul.innerHTML="";
     const d=document.createElement("button");d.className="del";d.textContent="✕";d.setAttribute("aria-label","Remove");d.onclick=()=>remove(i.id);
     li.append(c,t,h,d);ul.appendChild(li)})}
 
-$("#f").addEventListener("submit",async e=>{e.preventDefault();const v=$("#newItem").value.trim();if(!v||!cur)return;$("#newItem").value="";
+$("#f").addEventListener("submit",async e=>{e.preventDefault();const v=$("#newItem").value.trim();if(!v||!cur||!db)return;$("#newItem").value="";
   const id="i"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  items.push({id,room:cur,text:v.slice(0,200),done:false,fav:false,ts:Date.now()});store();render()});
-function save(id,patch){const i=items.find(x=>x.id===id);if(i)Object.assign(i,patch);store();render()}
-function remove(id){items=items.filter(x=>x.id!==id);store();render()}
-const KEY="little-house";
-function store(){try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}}
-try{items=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
+  try{await api("POST","/api/items",{room:cur,text:v.slice(0,200)})}catch(err){status("Couldn't save that.")}});
+async function save(id,patch){try{await api("PATCH","/api/items/"+id,patch)}catch(e){status("Couldn't save that change.")}}
+async function remove(id){try{await api("DELETE","/api/items/"+id)}catch(e){status("Couldn't remove that.")}}
+function status(s){$("#status").textContent=s}
 updTags();
+
+/* ---------- server sync: REST for writes, one WebSocket for live state ---------- */
+async function api(method,url,body){const r=await fetch(url,{method,headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,credentials:"same-origin"});
+  if(!r.ok)throw new Error(r.status);return r.status===204?null:r.json()}
+function applyState(st){items=st.items||[];started=st.started||null;const seen=new Set();
+  (st.layout||[]).forEach(v=>{const p=pieceById[v.piece];if(!p)return;seen.add(v.piece);if(grab&&grab.p===p)return;setPiece(p,+v.x||0,+v.z||0,+v.r||0)});
+  PIECES.forEach(p=>{if(!seen.has(p.userData.piece)&&!(grab&&grab.p===p)){const h=p.userData.home;setPiece(p,h[0],h[1],0)}});render()}
+let ws=null,retry=1000;
+function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onopen=()=>{retry=1000;db=true;status("")};
+  ws.onmessage=e=>{try{applyState(JSON.parse(e.data))}catch(err){}};
+  ws.onclose=ev=>{db=null;status("Reconnecting…");setTimeout(connect,retry);retry=Math.min(retry*2,15000)}}
+connect();
 </script>
 
 </body></html>
