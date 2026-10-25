@@ -14,6 +14,9 @@
 html,body{height:100%;margin:0}
 body{background:var(--plaster);color:var(--ink);font-family:var(--body);overflow:hidden}
 #scene{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+.tag{position:fixed;transform:translate(-50%,-100%);cursor:pointer;background:var(--ink);border:0;color:var(--paper);font:700 10px var(--body);letter-spacing:.16em;text-transform:uppercase;padding:6px 8px 6px 10px;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.tag b{background:var(--oxide);color:var(--paper);padding:1px 5px;font-variant-numeric:tabular-nums}
+.tag:hover,.tag:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
 #panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--paper);border-left:1px solid var(--ink);transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 #panel.open{transform:none}
 .ph{padding:20px 20px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--ink)}
@@ -46,6 +49,7 @@ li.done .chk{background:var(--oxide);border-color:var(--oxide)}
 </style>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
+<div id="tags"></div>
 <aside id="panel" aria-hidden="true">
   <div class="ph"><div><small id="pk"></small><h2 id="pt"></h2><p id="pd"></p></div><button class="x" id="close" aria-label="Back to the house">×</button></div>
   <form id="f"><input id="newItem" placeholder="Add something…" autocomplete="off"><button class="add">Add</button></form>
@@ -123,9 +127,15 @@ canvas.addEventListener("pointerup",e=>{
   if(moved<6){const r=pick(e);if(r)openRoom(r.id);else if(cur)closeRoom()}drag=null});
 canvas.addEventListener("wheel",e=>{tDist=Math.min(24,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
 let hov=null;function hover(e){hov=pick(e);canvas.style.cursor=hov?"pointer":"grab"}
+
+const tags=$("#tags");
+ROOMS.forEach(r=>{const b=document.createElement("button");b.className="tag";b.onclick=()=>openRoom(r.id);tags.appendChild(b);r.tag=b});
+function updTags(){ROOMS.forEach(r=>{r.tag.textContent=r.kind})}
+const tmp=new THREE.Vector3();
 function loop(t){
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
-  ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1});
+  ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
+    tmp.set(r.x*2,r.y+1.9,r.z*2).project(camera);r.tag.style.left=(tmp.x*.5+.5)*innerWidth+"px";r.tag.style.top=(-tmp.y*.5+.5)*innerHeight+"px";r.tag.hidden=!!cur||tmp.z>1});
   renderer.render(scene,camera);requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
@@ -137,7 +147,7 @@ function closeRoom(){cur=null;tTarget.set(0,.4,0);resize();$("#panel").classList
 $("#close").onclick=closeRoom;addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)closeRoom()});
 document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.dataset.f;document.querySelectorAll(".filters button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
 
-function render(){if(!cur)return;const ul=$("#list");ul.innerHTML="";
+function render(){updTags();if(!cur)return;const ul=$("#list");ul.innerHTML="";
   let rows=items.filter(i=>i.room===cur&&(filter==="all"||(filter==="done")===!!i.done));
   rows.sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(b.ts||0)-(a.ts||0));
   if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above.");ul.appendChild(e);return}
@@ -156,6 +166,7 @@ function remove(id){items=items.filter(x=>x.id!==id);store();render()}
 const KEY="little-house";
 function store(){try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}}
 try{items=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
+updTags();
 </script>
 
 </body></html>
