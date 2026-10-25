@@ -2,6 +2,7 @@
 
 Serves the 3D page, stores lists and furniture layout in SQLite, and pushes the
 full state to every open browser over a WebSocket whenever anything changes.
+Access is protected by one shared password (HOUSE_PASSWORD).
 """
 import hashlib
 import hmac
@@ -13,9 +14,11 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Cookie, FastAPI, HTTPException, Response
+from pydantic import BaseModel
 
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
+PASSWORD = os.environ.get("HOUSE_PASSWORD", "change-me")
 SECRET = os.environ.get("HOUSE_SECRET") or secrets.token_hex(32)  # set it in production so logins survive restarts
 COOKIE = "house_session"
 COOKIE_DAYS = 180
@@ -111,6 +114,28 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Our Little House", lifespan=lifespan)
+
+
+# ---------- models ----------
+class Login(BaseModel):
+    password: str
+
+
+# ---------- routes ----------
+@app.post("/api/login")
+def login(body: Login, response: Response):
+    if not hmac.compare_digest(body.password, PASSWORD):
+        raise HTTPException(401, "Wrong password")
+    expires = int(time.time()) + COOKIE_DAYS * 86400
+    response.set_cookie(COOKIE, sign(str(expires)), max_age=COOKIE_DAYS * 86400,
+                        httponly=True, samesite="lax", secure=os.environ.get("HOUSE_HTTPS") == "1")
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def me(house_session: Optional[str] = Cookie(None)):
+    require(house_session)
+    return {"ok": True}
 
 
 @app.get("/healthz")
