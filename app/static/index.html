@@ -74,6 +74,20 @@ let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clo
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();tDist=cur?7.5:(w<600?20:16)}
 addEventListener("resize",resize);resize();dist=tDist;
+
+let drag=null,moved=0;
+const ray=new THREE.Raycaster(),v2=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();
+function aim(e){v2.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);ray.setFromCamera(v2,camera)}
+function pick(e){aim(e);const h=ray.intersectObjects(picks)[0];return h&&h.object.userData.room}
+canvas.addEventListener("pointerdown",e=>{moved=0;canvas.setPointerCapture(e.pointerId);
+  drag={x:e.clientX,y:e.clientY}});
+canvas.addEventListener("pointermove",e=>{
+  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;phi=Math.min(1.35,Math.max(.35,phi-dy*.006));drag={x:e.clientX,y:e.clientY}}
+  else hover(e)});
+canvas.addEventListener("pointerup",e=>{
+  drag=null});
+canvas.addEventListener("wheel",e=>{tDist=Math.min(24,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
+let hov=null;function hover(e){hov=pick(e);canvas.style.cursor=hov?"pointer":"grab"}
 function loop(t){
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
   renderer.render(scene,camera);requestAnimationFrame(loop)}
