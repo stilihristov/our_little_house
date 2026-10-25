@@ -5,12 +5,24 @@ full state to every open browser over a WebSocket whenever anything changes.
 """
 import os
 import sqlite3
+import time
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
+
+SEED_ITEMS = [
+    ("movies", "Tekkonkinkreet (2006)", True, True),
+    ("movies", "Mind Game (2004)", False, False),
+    ("movies", "Mutafukaz (2017)", False, False),
+    ("movies", "The Night Is Short, Walk On Girl (2017)", False, True),
+    ("movies", "Children of the Sea (2019)", False, False),
+    ("movies", "Paprika (2006)", False, False),
+    ("movies", "Ping Pong the Animation (series)", False, False),
+    ("movies", "Redline (2009)", False, False),
+]
 
 
 # ---------- database ----------
@@ -39,6 +51,14 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
             """
         )
+        if not con.execute("SELECT 1 FROM meta WHERE key='started'").fetchone():
+            now = int(time.time() * 1000)
+            con.execute("INSERT INTO meta VALUES('started', ?)", (str(now),))
+            for n, (room, text, done, fav) in enumerate(SEED_ITEMS):
+                con.execute(
+                    "INSERT INTO items(id,room,text,done,fav,ts) VALUES(?,?,?,?,?,?)",
+                    (f"seed{n}", room, text, int(done), int(fav), now - n),
+                )
 
 
 def snapshot() -> dict:
