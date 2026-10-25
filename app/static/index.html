@@ -29,11 +29,22 @@ input{flex:1;min-width:0;background:#fff;border:1px solid var(--ink);border-righ
 input:focus{outline:2px solid var(--oxide);outline-offset:-2px}
 .add{background:var(--ink);color:var(--paper);border:0;padding:0 16px;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
 .add:hover{background:var(--oxide)}
+ul{list-style:none;margin:0;padding:0 20px 20px;overflow-y:auto;flex:1}
+li{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+li .t{flex:1;min-width:0;overflow-wrap:anywhere;font-size:15px}
+li.done .t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--oxide)}
+.chk{width:20px;height:20px;border:1.5px solid var(--ink);background:none;flex:none;color:var(--paper);font-size:12px;line-height:1;padding:0}
+li.done .chk{background:var(--oxide);border-color:var(--oxide)}
+.del{background:none;border:0;color:var(--muted);font-size:14px;padding:2px 4px;opacity:.5}
+.del:hover{opacity:1;color:var(--oxide)}
+.empty{color:var(--muted);padding:20px 0;font-size:14px}
 </style>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
 <aside id="panel" aria-hidden="true">
   <div class="ph"><div><small id="pk"></small><h2 id="pt"></h2><p id="pd"></p></div><button class="x" id="close" aria-label="Back to the house">×</button></div>
+  <form id="f"><input id="newItem" placeholder="Add something…" autocomplete="off"><button class="add">Add</button></form>
+  <ul id="list"></ul>
 </aside>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -114,10 +125,26 @@ requestAnimationFrame(loop);
 
 /* ---------- panel ---------- */
 function openRoom(id){const r=ROOMS.find(x=>x.id===id);cur=id;tTarget.set(r.x*2,r.y+.3,r.z*2);tDist=7.5;
-  $("#pk").textContent=r.name;$("#pt").textContent=r.kind;$("#pd").textContent=r.hint;
-  $("#panel").classList.add("open");document.body.classList.add("inroom");$("#panel").setAttribute("aria-hidden","false")}
+  $("#pk").textContent=r.name;$("#pt").textContent=r.kind;$("#pd").textContent=r.hint;$("#newItem").placeholder=r.ph;
+  $("#panel").classList.add("open");document.body.classList.add("inroom");$("#panel").setAttribute("aria-hidden","false");render()}
 function closeRoom(){cur=null;tTarget.set(0,.4,0);resize();$("#panel").classList.remove("open");document.body.classList.remove("inroom");$("#panel").setAttribute("aria-hidden","true")}
 $("#close").onclick=closeRoom;addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)closeRoom()});
+
+function render(){if(!cur)return;const ul=$("#list");ul.innerHTML="";
+  let rows=items.filter(i=>i.room===cur);
+  rows.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above.");ul.appendChild(e);return}
+  rows.forEach(i=>{const li=document.createElement("li");if(i.done)li.className="done";
+    const c=document.createElement("button");c.className="chk";c.textContent=i.done?"✓":"";c.setAttribute("aria-label",i.done?"Mark as not done":"Mark as done");c.onclick=()=>save(i.id,{done:!i.done,doneAt:i.done?null:Date.now()});
+    const t=document.createElement("span");t.className="t";t.textContent=i.text;
+    const d=document.createElement("button");d.className="del";d.textContent="✕";d.setAttribute("aria-label","Remove");d.onclick=()=>remove(i.id);
+    li.append(c,t,d);ul.appendChild(li)})}
+
+$("#f").addEventListener("submit",async e=>{e.preventDefault();const v=$("#newItem").value.trim();if(!v||!cur)return;$("#newItem").value="";
+  const id="i"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  items.push({id,room:cur,text:v.slice(0,200),done:false,fav:false,ts:Date.now()});render()});
+function save(id,patch){const i=items.find(x=>x.id===id);if(i)Object.assign(i,patch);render()}
+function remove(id){items=items.filter(x=>x.id!==id);render()}
 </script>
 
 </body></html>
