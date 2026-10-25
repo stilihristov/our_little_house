@@ -37,6 +37,9 @@ renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const BG=0xe4dfd4;
 const scene=new THREE.Scene();scene.background=new THREE.Color(BG);scene.fog=new THREE.Fog(BG,16,34);
 const camera=new THREE.PerspectiveCamera(32,1,.1,100);
+scene.add(new THREE.HemisphereLight(0xfffaf0,0x8a8070,.5));
+const sun=new THREE.DirectionalLight(0xfff1dc,.8);sun.position.set(-7,11,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0006;
+Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8});scene.add(sun);
 
 const mats={};function M(c){return mats[c]||(mats[c]=new THREE.MeshStandardMaterial({color:c,roughness:.92,flatShading:true}))}
 const PL=0xefebe3,PL2=0xdcd5c8,PL3=0xc8c0b1,INK=0x1d1c1a,WOOD=0xa98a63;
