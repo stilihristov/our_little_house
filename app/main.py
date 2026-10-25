@@ -128,6 +128,12 @@ class NewItem(BaseModel):
     text: str = Field(min_length=1, max_length=200)
 
 
+class ItemPatch(BaseModel):
+    text: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    done: Optional[bool] = None
+    fav: Optional[bool] = None
+
+
 # ---------- routes ----------
 @app.post("/api/login")
 def login(body: Login, response: Response):
@@ -159,6 +165,22 @@ async def add_item(body: NewItem, house_session: Optional[str] = Cookie(None)):
         con.execute("INSERT INTO items(id,room,text,ts) VALUES(?,?,?,?)",
                     (item_id, body.room, body.text.strip(), int(time.time() * 1000)))
     return {"id": item_id}
+
+
+@app.patch("/api/items/{item_id}")
+async def update_item(item_id: str, body: ItemPatch, house_session: Optional[str] = Cookie(None)):
+    require(house_session)
+    fields = body.model_dump(exclude_unset=True)
+    cols = {"text": "text", "done": "done", "fav": "fav"}
+    sets = [(cols[k], int(v) if isinstance(v, bool) else v) for k, v in fields.items()]
+    if not sets:
+        return {"ok": True}
+    with db() as con:
+        cur = con.execute(f"UPDATE items SET {', '.join(c + '=?' for c, _ in sets)} WHERE id=?",
+                          [v for _, v in sets] + [item_id])
+        if cur.rowcount == 0:
+            raise HTTPException(404, "No such item")
+    return {"ok": True}
 
 
 @app.delete("/api/items/{item_id}", status_code=204)
