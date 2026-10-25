@@ -60,6 +60,10 @@ ROOMS.forEach(r=>{
   r.glow=new THREE.PointLight(0xfff0d8,0,5,2);r.glow.position.set(0,1.6,0);grp.add(r.glow);
 });
 
+// grotto walls: overlapping tilted planes along back and left
+for(let i=0;i<7;i++){const h=1.6+hash("b"+i)*1.8,w=1+hash("bw"+i)*1.4;box(w,h,.12,i%3?PL:PL2,-3.6+i*1.2,h/2,-4.1+hash("bz"+i)*.2,scene,0,(hash("br"+i)-.5)*.35,(hash("bt"+i)-.5)*.25)}
+for(let i=0;i<6;i++){const h=1.2+hash("l"+i)*1.6,w=1+hash("lw"+i)*1.4;box(.12,h,w,i%2?PL:PL2,-4.1+hash("lz"+i)*.2,h/2,3.6-i*1.35,scene,(hash("lt"+i)-.5)*.25,(hash("lr"+i)-.5)*.3,0)}
+
 let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();tDist=cur?7.5:(w<600?20:16)}
