@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Our Little House</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;600;700&display=swap">
+<style>
+/* Layout: full-screen plaster diorama (WebGL, Merzbau-like stepped volumes) + slide-in room panel. Single committed light look. */
+:root{
+  --plaster:#e4dfd4; --paper:#f3efe6; --ink:#1d1c1a; --muted:#77716a; --oxide:#b5452f; --line:rgba(29,28,26,.16);
+  --display:"Instrument Serif",Georgia,serif; --body:"Archivo",system-ui,sans-serif;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--plaster);color:var(--ink);font-family:var(--body);overflow:hidden}
+#scene{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+</style>
+
+<canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const ROOMS=[
+ {id:"movies",name:"Living room",kind:"Movie night",hint:"Films to watch together",ph:"Add a film…",x:-1,z:1,lvl:0,acc:0x2f4fa8},
+ {id:"food",name:"Kitchen",kind:"Food ideas",hint:"Recipes to cook and places to eat",ph:"Add a dish or restaurant…",x:1,z:1,lvl:1,acc:0xc9952f},
+ {id:"dates",name:"Bedroom",kind:"Date ideas",hint:"Things to do, big and small",ph:"Add a date idea…",x:-1,z:-1,lvl:2,acc:0xb5452f},
+ {id:"trips",name:"Garden",kind:"Places to go",hint:"Trips and weekends away",ph:"Add a place…",x:1,z:-1,lvl:3,acc:0x3f6b4c}
+];
+let items=[],cur=null,filter="todo",db=null,started=null;
+const $=s=>document.querySelector(s);
+function hash(s){let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/4294967295}
+
+/* ---------- 3D ---------- */
+const canvas=$("#scene");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const BG=0xe4dfd4;
+const scene=new THREE.Scene();scene.background=new THREE.Color(BG);scene.fog=new THREE.Fog(BG,16,34);
+const camera=new THREE.PerspectiveCamera(32,1,.1,100);
+
+const mats={};function M(c){return mats[c]||(mats[c]=new THREE.MeshStandardMaterial({color:c,roughness:.92,flatShading:true}))}
+const PL=0xefebe3,PL2=0xdcd5c8,PL3=0xc8c0b1,INK=0x1d1c1a,WOOD=0xa98a63;
+function box(w,h,d,c,x,y,z,p=scene,rx=0,ry=0,rz=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.castShadow=m.receiveShadow=true;p.add(m);return m}
+function prism(r,h,c,x,y,z,p,ry=0,rz=0,sides=3){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,sides),M(c));m.position.set(x,y,z);m.rotation.set(0,ry,rz);m.castShadow=m.receiveShadow=true;p.add(m);return m}
+
+// ground + plinth
+const g=new THREE.Mesh(new THREE.PlaneGeometry(80,80),M(0xd9d3c6));g.rotation.x=-Math.PI/2;g.position.y=-.4;g.receiveShadow=true;scene.add(g);
+box(8.8,.4,8.8,PL2,0,-.2,0);
+
+let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
+function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();tDist=cur?7.5:(w<600?20:16)}
+addEventListener("resize",resize);resize();dist=tDist;
+function loop(t){
+  target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
+  renderer.render(scene,camera);requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+
+</body></html>

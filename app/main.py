@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from fastapi import Cookie, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
@@ -23,6 +25,7 @@ PASSWORD = os.environ.get("HOUSE_PASSWORD", "change-me")
 SECRET = os.environ.get("HOUSE_SECRET") or secrets.token_hex(32)  # set it in production so logins survive restarts
 COOKIE = "house_session"
 COOKIE_DAYS = 180
+STATIC = Path(__file__).parent / "static"
 
 Room = Literal["movies", "food", "dates", "trips"]
 PIECES = {"screen", "bench", "cube", "counter", "cylinder", "table", "stair", "sphere", "bed", "column"}
@@ -264,3 +267,11 @@ async def ws_endpoint(ws: WebSocket):
 @app.get("/healthz")
 def health():
     return {"ok": True}
+
+
+@app.get("/")
+def index():
+    return FileResponse(STATIC / "index.html")
+
+
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
