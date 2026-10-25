@@ -4,6 +4,7 @@ Serves the 3D page, stores lists and furniture layout in SQLite, and pushes the
 full state to every open browser over a WebSocket whenever anything changes.
 Access is protected by one shared password (HOUSE_PASSWORD).
 """
+import asyncio
 import hashlib
 import hmac
 import os
@@ -14,7 +15,7 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import Cookie, FastAPI, HTTPException, Response
+from fastapi import Cookie, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
@@ -110,6 +111,26 @@ def require(token: Optional[str]) -> None:
         raise HTTPException(401, "Sign in first")
 
 
+# ---------- live sync ----------
+class Hub:
+    def __init__(self) -> None:
+        self.clients: set[WebSocket] = set()
+
+    async def broadcast(self) -> None:
+        state = snapshot()
+        dead = []
+        for ws in list(self.clients):
+            try:
+                await ws.send_json(state)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.clients.discard(ws)
+
+
+hub = Hub()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
@@ -171,6 +192,7 @@ async def add_item(body: NewItem, house_session: Optional[str] = Cookie(None)):
     with db() as con:
         con.execute("INSERT INTO items(id,room,text,ts) VALUES(?,?,?,?)",
                     (item_id, body.room, body.text.strip(), int(time.time() * 1000)))
+    await hub.broadcast()
     return {"id": item_id}
 
 
@@ -187,6 +209,7 @@ async def update_item(item_id: str, body: ItemPatch, house_session: Optional[str
                           [v for _, v in sets] + [item_id])
         if cur.rowcount == 0:
             raise HTTPException(404, "No such item")
+    await hub.broadcast()
     return {"ok": True}
 
 
@@ -195,6 +218,7 @@ async def delete_item(item_id: str, house_session: Optional[str] = Cookie(None))
     require(house_session)
     with db() as con:
         con.execute("DELETE FROM items WHERE id=?", (item_id,))
+    await hub.broadcast()
     return Response(status_code=204)
 
 
@@ -206,6 +230,7 @@ async def place_piece(piece: str, body: Place, house_session: Optional[str] = Co
     with db() as con:
         con.execute("INSERT INTO layout VALUES(?,?,?,?) ON CONFLICT(piece) DO UPDATE SET x=excluded.x, z=excluded.z, r=excluded.r",
                     (piece, body.x, body.z, body.r))
+    await hub.broadcast()
     return {"ok": True}
 
 
@@ -214,7 +239,26 @@ async def reset_layout(house_session: Optional[str] = Cookie(None)):
     require(house_session)
     with db() as con:
         con.execute("DELETE FROM layout")
+    await hub.broadcast()
     return Response(status_code=204)
+
+
+@app.websocket("/ws")
+async def ws_endpoint(ws: WebSocket):
+    await ws.accept()
+    if not valid(ws.cookies.get(COOKIE)):
+        await ws.close(code=4401)
+        return
+    hub.clients.add(ws)
+    try:
+        await ws.send_json(snapshot())
+        while True:
+            # clients only listen; this keeps the connection open and notices disconnects
+            await asyncio.wait_for(ws.receive_text(), timeout=None)
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        hub.clients.discard(ws)
 
 
 @app.get("/healthz")
