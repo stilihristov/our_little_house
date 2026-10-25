@@ -24,6 +24,7 @@ COOKIE = "house_session"
 COOKIE_DAYS = 180
 
 Room = Literal["movies", "food", "dates", "trips"]
+PIECES = {"screen", "bench", "cube", "counter", "cylinder", "table", "stair", "sphere", "bed", "column"}
 
 SEED_ITEMS = [
     ("movies", "Tekkonkinkreet (2006)", True, True),
@@ -134,6 +135,12 @@ class ItemPatch(BaseModel):
     fav: Optional[bool] = None
 
 
+class Place(BaseModel):
+    x: float
+    z: float
+    r: float
+
+
 # ---------- routes ----------
 @app.post("/api/login")
 def login(body: Login, response: Response):
@@ -188,6 +195,25 @@ async def delete_item(item_id: str, house_session: Optional[str] = Cookie(None))
     require(house_session)
     with db() as con:
         con.execute("DELETE FROM items WHERE id=?", (item_id,))
+    return Response(status_code=204)
+
+
+@app.put("/api/layout/{piece}")
+async def place_piece(piece: str, body: Place, house_session: Optional[str] = Cookie(None)):
+    require(house_session)
+    if piece not in PIECES:
+        raise HTTPException(404, "No such piece")
+    with db() as con:
+        con.execute("INSERT INTO layout VALUES(?,?,?,?) ON CONFLICT(piece) DO UPDATE SET x=excluded.x, z=excluded.z, r=excluded.r",
+                    (piece, body.x, body.z, body.r))
+    return {"ok": True}
+
+
+@app.delete("/api/layout", status_code=204)
+async def reset_layout(house_session: Optional[str] = Cookie(None)):
+    require(house_session)
+    with db() as con:
+        con.execute("DELETE FROM layout")
     return Response(status_code=204)
 
 
