@@ -150,9 +150,12 @@ function render(){if(!cur)return;const ul=$("#list");ul.innerHTML="";
 
 $("#f").addEventListener("submit",async e=>{e.preventDefault();const v=$("#newItem").value.trim();if(!v||!cur)return;$("#newItem").value="";
   const id="i"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  items.push({id,room:cur,text:v.slice(0,200),done:false,fav:false,ts:Date.now()});render()});
-function save(id,patch){const i=items.find(x=>x.id===id);if(i)Object.assign(i,patch);render()}
-function remove(id){items=items.filter(x=>x.id!==id);render()}
+  items.push({id,room:cur,text:v.slice(0,200),done:false,fav:false,ts:Date.now()});store();render()});
+function save(id,patch){const i=items.find(x=>x.id===id);if(i)Object.assign(i,patch);store();render()}
+function remove(id){items=items.filter(x=>x.id!==id);store();render()}
+const KEY="little-house";
+function store(){try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}}
+try{items=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
 </script>
 
 </body></html>
