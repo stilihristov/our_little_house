@@ -50,6 +50,16 @@ function prism(r,h,c,x,y,z,p,ry=0,rz=0,sides=3){const m=new THREE.Mesh(new THREE
 const g=new THREE.Mesh(new THREE.PlaneGeometry(80,80),M(0xd9d3c6));g.rotation.x=-Math.PI/2;g.position.y=-.4;g.receiveShadow=true;scene.add(g);
 box(8.8,.4,8.8,PL2,0,-.2,0);
 
+// rooms as stepped terraces
+const picks=[];const STEP=.22;
+ROOMS.forEach(r=>{
+  const y=r.lvl*STEP;const grp=new THREE.Group();grp.position.set(r.x*2,y,r.z*2);scene.add(grp);r.group=grp;r.y=y;
+  const fl=box(3.96,.16+y,3.96,PL,0,-(y)/2,0,grp);fl.userData.room=r;picks.push(fl);r.floorMesh=fl;
+  // accent inlay
+  const inl=box(1.1,.02,.18,r.acc,-1.2+hash(r.id)*.6,.09,1.6-hash(r.id+"i")*.4,grp);
+  r.glow=new THREE.PointLight(0xfff0d8,0,5,2);r.glow.position.set(0,1.6,0);grp.add(r.glow);
+});
+
 let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();tDist=cur?7.5:(w<600?20:16)}
