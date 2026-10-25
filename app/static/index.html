@@ -14,9 +14,27 @@
 html,body{height:100%;margin:0}
 body{background:var(--plaster);color:var(--ink);font-family:var(--body);overflow:hidden}
 #scene{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+#panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--paper);border-left:1px solid var(--ink);transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+#panel.open{transform:none}
+.ph{padding:20px 20px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--ink)}
+.ph div{flex:1;min-width:0}
+.ph small{color:var(--oxide);font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.ph h2{font-family:var(--display);font-weight:400;font-size:38px;margin:.1em 0 0;line-height:1}
+.ph p{margin:.4em 0 0;color:var(--muted);font-size:13px}
+button{font:inherit;cursor:pointer}
+.x{background:none;border:1px solid var(--ink);color:var(--ink);width:34px;height:34px;font-size:18px}
+.x:hover{background:var(--ink);color:var(--paper)}
+form{display:flex;gap:0;padding:14px 20px}
+input{flex:1;min-width:0;background:#fff;border:1px solid var(--ink);border-right:0;color:var(--ink);padding:10px 12px;font:14px var(--body);border-radius:0}
+input:focus{outline:2px solid var(--oxide);outline-offset:-2px}
+.add{background:var(--ink);color:var(--paper);border:0;padding:0 16px;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.add:hover{background:var(--oxide)}
 </style>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
+<aside id="panel" aria-hidden="true">
+  <div class="ph"><div><small id="pk"></small><h2 id="pt"></h2><p id="pd"></p></div><button class="x" id="close" aria-label="Back to the house">×</button></div>
+</aside>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const ROOMS=[
@@ -85,13 +103,21 @@ canvas.addEventListener("pointermove",e=>{
   if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;phi=Math.min(1.35,Math.max(.35,phi-dy*.006));drag={x:e.clientX,y:e.clientY}}
   else hover(e)});
 canvas.addEventListener("pointerup",e=>{
-  drag=null});
+  if(moved<6){const r=pick(e);if(r)openRoom(r.id);else if(cur)closeRoom()}drag=null});
 canvas.addEventListener("wheel",e=>{tDist=Math.min(24,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
 let hov=null;function hover(e){hov=pick(e);canvas.style.cursor=hov?"pointer":"grab"}
 function loop(t){
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
+  ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1});
   renderer.render(scene,camera);requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
+
+/* ---------- panel ---------- */
+function openRoom(id){const r=ROOMS.find(x=>x.id===id);cur=id;tTarget.set(r.x*2,r.y+.3,r.z*2);tDist=7.5;
+  $("#pk").textContent=r.name;$("#pt").textContent=r.kind;$("#pd").textContent=r.hint;
+  $("#panel").classList.add("open");document.body.classList.add("inroom");$("#panel").setAttribute("aria-hidden","false")}
+function closeRoom(){cur=null;tTarget.set(0,.4,0);resize();$("#panel").classList.remove("open");document.body.classList.remove("inroom");$("#panel").setAttribute("aria-hidden","true")}
+$("#close").onclick=closeRoom;addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)closeRoom()});
 </script>
 
 </body></html>
