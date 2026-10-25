@@ -3,15 +3,22 @@
 Serves the 3D page, stores lists and furniture layout in SQLite, and pushes the
 full state to every open browser over a WebSocket whenever anything changes.
 """
+import hashlib
+import hmac
 import os
+import secrets
 import sqlite3
 import time
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
+SECRET = os.environ.get("HOUSE_SECRET") or secrets.token_hex(32)  # set it in production so logins survive restarts
+COOKIE = "house_session"
+COOKIE_DAYS = 180
 
 SEED_ITEMS = [
     ("movies", "Tekkonkinkreet (2006)", True, True),
@@ -71,6 +78,30 @@ def snapshot() -> dict:
         layout = [dict(r) for r in con.execute("SELECT * FROM layout")]
         started = con.execute("SELECT value FROM meta WHERE key='started'").fetchone()
     return {"items": items, "layout": layout, "started": int(started[0]) if started else None}
+
+
+# ---------- auth: one shared password, signed cookie ----------
+def sign(value: str) -> str:
+    mac = hmac.new(SECRET.encode(), value.encode(), hashlib.sha256).hexdigest()
+    return f"{value}.{mac}"
+
+
+def valid(token: Optional[str]) -> bool:
+    if not token or "." not in token:
+        return False
+    value, mac = token.rsplit(".", 1)
+    expected = hmac.new(SECRET.encode(), value.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(mac, expected):
+        return False
+    try:
+        return int(value) > time.time()
+    except ValueError:
+        return False
+
+
+def require(token: Optional[str]) -> None:
+    if not valid(token):
+        raise HTTPException(401, "Sign in first")
 
 
 @asynccontextmanager
