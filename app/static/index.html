@@ -17,14 +17,6 @@ body{background:#0c0c0c;color:var(--ink);font:14px var(--body);overflow:hidden}
 button{font:inherit;cursor:pointer}
 [hidden]{display:none!important}
 
-header{position:fixed;left:16px;top:calc(16px + env(safe-area-inset-top,0px));pointer-events:none;max-width:62%}
-h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,5vw,48px);margin:0;line-height:.95;text-wrap:balance}
-h1 em{color:var(--oxide)}
-header p{margin:.5em 0 0;color:var(--muted);font-size:12px;letter-spacing:.02em}
-header .grow{color:var(--ink);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-variant-numeric:tabular-nums}
-.tag{position:fixed;transform:translate(-50%,-100%);cursor:pointer;background:var(--ink);border:0;color:var(--paper);font:700 10px var(--body);letter-spacing:.16em;text-transform:uppercase;padding:6px 8px 6px 10px;white-space:nowrap;display:flex;gap:8px;align-items:center}
-.tag b{background:var(--oxide);color:var(--paper);padding:1px 5px;font-variant-numeric:tabular-nums}
-.tag:hover,.tag:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
 #panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
   filter:grayscale(1);background:#0f0f0f;color:#e8e8e8;border-left:1px solid #e8e8e8;z-index:5}
 #panel.open{transform:none}
@@ -75,8 +67,6 @@ body.inroom .tools{display:none}
 <body>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
-<header><h1>Our <em>little</em> house</h1><p>Drag to look around. Tap a room to go inside.</p><p id="grow" class="grow"></p></header>
-<div id="tags"></div>
 <aside id="panel" aria-hidden="true">
   <div class="ph"><div><small id="pk"></small><h2 id="pt"></h2><p id="pd"></p></div><button class="x" id="close" aria-label="Back to the house">×</button></div>
   <form id="f"><input id="newItem" placeholder="Add something…" autocomplete="off"><button class="add">Add</button></form>
@@ -189,8 +179,8 @@ function growShards(done){const key=done.map(i=>i.id).join();if(key===shardKey)r
 function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0;
   colVisible=Math.min(colSegs.length,3+Math.floor(Math.sqrt(days)*2.2));
   ROOMS.forEach(r=>buildSpire(r,items.filter(i=>i.room===r.id&&i.done).length));
-  const done=items.filter(i=>i.done).sort((a,b)=>(a.ts||0)-(b.ts||0));growShards(done);
-  $("#grow").textContent=started?`Day ${Math.floor(days)+1} · ${done.length} done · column ${colVisible} high`:""}
+  growShards(items.filter(i=>i.done).sort((a,b)=>(a.ts||0)-(b.ts||0)));
+}
 
 let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
@@ -219,14 +209,9 @@ const arrBtn=$("#arrange"),resetBtn=$("#reset");
 arrBtn.onclick=()=>{arrange=!arrange;if(arrange&&cur)closeRoom();arrBtn.setAttribute("aria-pressed",arrange);arrBtn.textContent=arrange?"Done":"Arrange";$("#hint").hidden=!arrange;resetBtn.hidden=!arrange;document.body.classList.toggle("arranging",arrange)};
 resetBtn.onclick=async()=>{PIECES.forEach(p=>{const h=p.userData.home;setPiece(p,h[0],h[1],0)});if(db)try{await api("DELETE","/api/layout")}catch(e){}};
 
-const tags=$("#tags");
-ROOMS.forEach(r=>{const b=document.createElement("button");b.className="tag";b.onclick=()=>openRoom(r.id);tags.appendChild(b);r.tag=b});
-function updTags(){ROOMS.forEach(r=>{r.tag.textContent=r.kind})}
-const tmp=new THREE.Vector3();
 function loop(t){
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
   ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
-    tmp.set(r.x*2,r.y+1.9,r.z*2).project(camera);r.tag.style.left=(tmp.x*.5+.5)*innerWidth+"px";r.tag.style.top=(-tmp.y*.5+.5)*innerHeight+"px";r.tag.hidden=!!cur||tmp.z>1;
     r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
   let y=0;colSegs.forEach((m,i)=>{const tg=i<colVisible?1:.001;const s=m.scale.x+(tg-m.scale.x)*(.03+i*.002);m.scale.setScalar(s);m.position.y=y+m.userData.h*s/2;y+=m.userData.h*s});
   PIECES.forEach(p=>{const q=p.userData.t,lift=(grab&&grab.p===p)?.25:(hovPiece===p?.08:0);
@@ -244,7 +229,7 @@ function closeRoom(){cur=null;tTarget.set(0,.4,0);resize();$("#panel").classList
 $("#close").onclick=closeRoom;addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)closeRoom()});
 document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.dataset.f;document.querySelectorAll(".filters button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
 
-function render(){updTags();updGrowth();if(!cur)return;const ul=$("#list");ul.innerHTML="";
+function render(){updGrowth();if(!cur)return;const ul=$("#list");ul.innerHTML="";
   let rows=items.filter(i=>i.room===cur&&(filter==="all"||(filter==="done")===!!i.done));
   rows.sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(b.ts||0)-(a.ts||0));
   if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=db?(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above."):"Sign in to see your lists.";ul.appendChild(e);return}
@@ -261,7 +246,7 @@ $("#f").addEventListener("submit",async e=>{e.preventDefault();const v=$("#newIt
 async function save(id,patch){try{await api("PATCH","/api/items/"+id,patch)}catch(e){status("Couldn't save that change.")}}
 async function remove(id){try{await api("DELETE","/api/items/"+id)}catch(e){status("Couldn't remove that.")}}
 function status(s){$("#status").textContent=s}
-updTags();updGrowth();
+updGrowth();
 
 /* ---------- server sync: REST for writes, one WebSocket for live state ---------- */
 async function api(method,url,body){const r=await fetch(url,{method,headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,credentials:"same-origin"});
