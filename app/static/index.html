@@ -152,6 +152,16 @@ piece("table","food",-.2,.5,p=>{box(1.2,.08,1.2,WOOD,0,.55,0,p,0,.4,0);box(.12,.
 piece("stair","dates",-.6,.1,p=>{for(let i=0;i<5;i++)box(.9,.18*(i+1),.4,i%2?PL:PL2,0,.09*(i+1),.8-i*.4,p)});
 piece("sphere","dates",.9,.1,p=>mesh(new THREE.SphereGeometry(.38,20,14),0xb5452f,0,.46,0,p));
 piece("bed","dates",.5,-1.1,p=>box(1.4,.3,1.8,PL,0,.15,0,p,0,-.2,0));
+// garden: the growing Merz column (movable too)
+const column=new THREE.Group();piece("column","trips",.5,-.5,p=>p.add(column));
+const colSegs=[];
+for(let i=0;i<22;i++){const s=1-i*.028,h=.18+hash("ch"+i)*.22;const c=(i%5===3)?[0xb5452f,0x2f4fa8,0xc9952f,INK][i%4]:(i%2?PL:PL2);
+  const m=new THREE.Mesh(i%3===1?new THREE.CylinderGeometry(.42*s,.42*s,h,3):new THREE.BoxGeometry(.7*s,h,.7*s),M(c));
+  m.rotation.y=hash("cr"+i)*Math.PI;m.position.x=(hash("cx"+i)-.5)*.18;m.position.z=(hash("cz"+i)-.5)*.18;m.castShadow=m.receiveShadow=true;m.userData.h=h;m.scale.setScalar(.001);column.add(m);colSegs.push(m)}
+let colVisible=0;
+
+function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0;
+  colVisible=Math.min(colSegs.length,3+Math.floor(Math.sqrt(days)*2.2));}
 
 let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
@@ -188,8 +198,10 @@ function loop(t){
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
   ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
     tmp.set(r.x*2,r.y+1.9,r.z*2).project(camera);r.tag.style.left=(tmp.x*.5+.5)*innerWidth+"px";r.tag.style.top=(-tmp.y*.5+.5)*innerHeight+"px";r.tag.hidden=!!cur||tmp.z>1});
+  let y=0;colSegs.forEach((m,i)=>{const tg=i<colVisible?1:.001;const s=m.scale.x+(tg-m.scale.x)*(.03+i*.002);m.scale.setScalar(s);m.position.y=y+m.userData.h*s/2;y+=m.userData.h*s});
   PIECES.forEach(p=>{const q=p.userData.t,lift=(grab&&grab.p===p)?.25:(hovPiece===p?.08:0);
     p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]+lift-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
+  column.rotation.y=Math.sin(t*.0002)*.05;
   renderer.render(scene,camera);requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
@@ -201,7 +213,7 @@ function closeRoom(){cur=null;tTarget.set(0,.4,0);resize();$("#panel").classList
 $("#close").onclick=closeRoom;addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)closeRoom()});
 document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.dataset.f;document.querySelectorAll(".filters button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
 
-function render(){updTags();if(!cur)return;const ul=$("#list");ul.innerHTML="";
+function render(){updTags();updGrowth();if(!cur)return;const ul=$("#list");ul.innerHTML="";
   let rows=items.filter(i=>i.room===cur&&(filter==="all"||(filter==="done")===!!i.done));
   rows.sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(b.ts||0)-(a.ts||0));
   if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=db?(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above."):"Sign in to see your lists.";ul.appendChild(e);return}
@@ -218,7 +230,7 @@ $("#f").addEventListener("submit",async e=>{e.preventDefault();const v=$("#newIt
 async function save(id,patch){try{await api("PATCH","/api/items/"+id,patch)}catch(e){status("Couldn't save that change.")}}
 async function remove(id){try{await api("DELETE","/api/items/"+id)}catch(e){status("Couldn't remove that.")}}
 function status(s){$("#status").textContent=s}
-updTags();
+updTags();updGrowth();
 
 /* ---------- server sync: REST for writes, one WebSocket for live state ---------- */
 async function api(method,url,body){const r=await fetch(url,{method,headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,credentials:"same-origin"});
