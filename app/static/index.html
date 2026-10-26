@@ -169,10 +169,19 @@ function buildSpire(r,n){if(n===r.spireN)return;const old=r.spireN<0?0:r.spireN;
     const m=box(w,h,w,c,(hash(r.id+"x"+i)-.5)*.06,y+h/2,(hash(r.id+"z"+i)-.5)*.06,r.spire,0,hash(r.id+"r"+i)*1.6,0);m.userData.h=h;
     if(i>=old){m.scale.setScalar(.001);m.userData.grow=1}y+=h}}
 var sp;
+// shards in the garden: one per ticked-off item anywhere
+const shardG=new THREE.Group();ROOMS[3].group.add(shardG);const SC=[0xb5452f,0x2f4fa8,0xc9952f,0x1d1c1a,0xefebe3];let shardKey="";
+function growShards(done){const key=done.map(i=>i.id).join();if(key===shardKey)return;const had=new Set(shardG.children.map(c=>c.userData.id));shardKey=key;
+  while(shardG.children.length)shardG.remove(shardG.children[0]);
+  done.slice(0,60).forEach(i=>{let x=-1.7+hash(i.id)*3.4,z=-1.7+hash(i.id+"z")*3.4;if(Math.hypot(x-.5,z+.5)<.7){x=x<.5?x-.7:x+.7}
+    const t=new THREE.Mesh(new THREE.TetrahedronGeometry(.08+hash(i.id+"s")*.1),M(SC[Math.floor(hash(i.id+"c")*SC.length)]));
+    t.position.set(x,.12,z);t.rotation.set(hash(i.id+"a")*3,hash(i.id+"b")*3,0);t.castShadow=true;t.userData.id=i.id;
+    if(!had.has(i.id)){t.scale.setScalar(.001);t.userData.grow=1}shardG.add(t)})}
 
 function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0;
   colVisible=Math.min(colSegs.length,3+Math.floor(Math.sqrt(days)*2.2));
-  ROOMS.forEach(r=>buildSpire(r,items.filter(i=>i.room===r.id&&i.done).length));}
+  ROOMS.forEach(r=>buildSpire(r,items.filter(i=>i.room===r.id&&i.done).length));
+  const done=items.filter(i=>i.done).sort((a,b)=>(a.ts||0)-(b.ts||0));growShards(done);}
 
 let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
@@ -214,6 +223,7 @@ function loop(t){
   PIECES.forEach(p=>{const q=p.userData.t,lift=(grab&&grab.p===p)?.25:(hovPiece===p?.08:0);
     p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]+lift-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
   column.rotation.y=Math.sin(t*.0002)*.05;
+  shardG.children.forEach(c=>{if(c.userData.grow){const s=c.scale.x+(1-c.scale.x)*.06;c.scale.setScalar(s);if(s>.99)c.userData.grow=0}});
   renderer.render(scene,camera);requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
