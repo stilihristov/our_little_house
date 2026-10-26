@@ -94,9 +94,11 @@ const canvas=$("#scene");
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-const BG=0xe4dfd4;
-const scene=new THREE.Scene();scene.background=new THREE.Color(BG);scene.fog=new THREE.Fog(BG,16,34);
-const camera=new THREE.PerspectiveCamera(32,1,.1,100);
+const BG=0x141210;
+const scene=new THREE.Scene();scene.background=new THREE.Color(BG);
+// axonometric camera orbiting the house: Q/E (or a sideways drag) turn it in 45° steps
+const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,200);
+const PHI=.6,TURN=Math.PI/4;let theta=TURN,tTheta=theta,thetaV=0,prevW=0,shift=0;
 scene.add(new THREE.HemisphereLight(0xfffaf0,0x8a8070,.5));
 const sun=new THREE.DirectionalLight(0xfff1dc,.8);sun.position.set(-7,11,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0006;
 Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8});scene.add(sun);
@@ -182,14 +184,21 @@ function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0
   growShards(items.filter(i=>i.done).sort((a,b)=>(a.ts||0)-(b.ts||0)));
 }
 
-let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
-function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
-function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();tDist=cur?7.5:(w<600?20:16)}
+const HOME=new THREE.Vector3(0,.9,0);
+let dist=12,target=HOME.clone(),tTarget=target.clone(),tDist=dist;
+function place(){const c=Math.cos(PHI);
+  camera.position.set(target.x+Math.sin(theta)*c*60,target.y+Math.sin(PHI)*60,target.z+Math.cos(theta)*c*60);camera.lookAt(target);camera.updateMatrixWorld();
+  // fit the plinth's diagonal (≈12.4) plus wall height, whatever the turn, so the house never clips
+  const a=innerWidth/innerHeight,needH=(12.4*Math.sin(PHI)+3.6*c)/2*1.12,needW=6.2*1.1;
+  const hh=Math.max(needH,needW/a)*dist/12,hw=hh*a;
+  Object.assign(camera,{left:-hw+shift,right:hw+shift,top:hh,bottom:-hh});camera.updateProjectionMatrix()}
+function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);tDist=cur?7.5:12}
 addEventListener("resize",resize);resize();dist=tDist;
 
 let drag=null,moved=0,arrange=false,grab=null,hovPiece=null;
 const ray=new THREE.Raycaster(),v2=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();
-function aim(e){v2.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);ray.setFromCamera(v2,camera)}
+function aim(e){v2.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);
+  const o=new THREE.Vector3(v2.x,v2.y,-1).unproject(camera),f=new THREE.Vector3(v2.x,v2.y,1).unproject(camera);ray.ray.origin.copy(o);ray.ray.direction.copy(f.sub(o).normalize());ray.near=0;ray.far=Infinity;ray.camera=camera}
 function pick(e){aim(e);const h=ray.intersectObjects(picks)[0];return h&&h.object.userData.room}
 function pickPiece(e){aim(e);const h=ray.intersectObjects(PIECES,true)[0];if(!h)return null;let o=h.object;while(o&&!o.userData.piece)o=o.parent;return o}
 canvas.addEventListener("pointerdown",e=>{moved=0;canvas.setPointerCapture(e.pointerId);
@@ -197,7 +206,7 @@ canvas.addEventListener("pointerdown",e=>{moved=0;canvas.setPointerCapture(e.poi
   drag={x:e.clientX,y:e.clientY}});
 canvas.addEventListener("pointermove",e=>{
   if(grab){moved+=Math.abs(e.movementX)+Math.abs(e.movementY);aim(e);if(ray.ray.intersectPlane(plane,hit)){const t=grab.p.userData.t;setPiece(grab.p,hit.x+grab.dx,hit.z+grab.dz,t[3])}return}
-  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;phi=Math.min(1.35,Math.max(.35,phi-dy*.006));drag={x:e.clientX,y:e.clientY}}
+  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;drag={x:e.clientX,y:e.clientY}}
   else hover(e)});
 canvas.addEventListener("pointerup",e=>{
   if(grab){const p=grab.p,t=p.userData.t;if(moved<6)setPiece(p,t[0],t[2],t[3]+Math.PI/4);savePiece(p);grab=null;return}
