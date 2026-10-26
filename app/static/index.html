@@ -25,29 +25,29 @@ header .grow{color:var(--ink);font-size:11px;letter-spacing:.14em;text-transform
 .tag{position:fixed;transform:translate(-50%,-100%);cursor:pointer;background:var(--ink);border:0;color:var(--paper);font:700 10px var(--body);letter-spacing:.16em;text-transform:uppercase;padding:6px 8px 6px 10px;white-space:nowrap;display:flex;gap:8px;align-items:center}
 .tag b{background:var(--oxide);color:var(--paper);padding:1px 5px;font-variant-numeric:tabular-nums}
 .tag:hover,.tag:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
-#panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--paper);border-left:1px solid var(--ink);transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+#panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  filter:grayscale(1);background:#0f0f0f;color:#e8e8e8;border-left:1px solid #e8e8e8;z-index:5}
 #panel.open{transform:none}
-.ph{padding:20px 20px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--ink)}
+.ph{padding:20px 20px 14px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid #e8e8e8}
 .ph div{flex:1;min-width:0}
 .ph small{color:var(--oxide);font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
-.ph h2{font-family:var(--display);font-weight:400;font-size:38px;margin:.1em 0 0;line-height:1}
+.ph h2{font-family:var(--display);font-weight:700;font-size:34px;letter-spacing:-.02em;margin:.1em 0 0;line-height:1}
 .ph p{margin:.4em 0 0;color:var(--muted);font-size:13px}
-button{font:inherit;cursor:pointer}
-.x{background:none;border:1px solid var(--ink);color:var(--ink);width:34px;height:34px;font-size:18px}
-.x:hover{background:var(--ink);color:var(--paper)}
-form{display:flex;gap:0;padding:14px 20px}
-input{flex:1;min-width:0;background:#fff;border:1px solid var(--ink);border-right:0;color:var(--ink);padding:10px 12px;font:14px var(--body);border-radius:0}
-input:focus{outline:2px solid var(--oxide);outline-offset:-2px}
-.add{background:var(--ink);color:var(--paper);border:0;padding:0 16px;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.x{background:none;border:1px solid #e8e8e8;color:#e8e8e8;width:34px;height:34px;font-size:18px}
+.x:hover{background:#e8e8e8;color:#0f0f0f}
+#f{display:flex;gap:0;padding:14px 20px}
+#newItem{flex:1;min-width:0;background:#1a1a1a;border:1px solid #e8e8e8;border-right:0;color:#eee;padding:10px 12px;font:14px var(--body);border-radius:0}
+#newItem:focus{outline:2px solid var(--oxide);outline-offset:-2px}
+.add{background:#e8e8e8;color:#0f0f0f;border:0;padding:0 16px;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
 .add:hover{background:var(--oxide)}
 .filters{display:flex;gap:16px;padding:0 20px 8px}
 .filters button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:4px 0;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
-.filters button[aria-pressed=true]{color:var(--ink);border-color:var(--oxide)}
+.filters button[aria-pressed=true]{color:#e8e8e8;border-color:var(--oxide)}
 ul{list-style:none;margin:0;padding:0 20px 20px;overflow-y:auto;flex:1}
-li{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+li{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.12)}
 li .t{flex:1;min-width:0;overflow-wrap:anywhere;font-size:15px}
 li.done .t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--oxide)}
-.chk{width:20px;height:20px;border:1.5px solid var(--ink);background:none;flex:none;color:var(--paper);font-size:12px;line-height:1;padding:0}
+.chk{width:20px;height:20px;border:1.5px solid #e8e8e8;background:none;flex:none;color:var(--paper);font-size:12px;line-height:1;padding:0}
 li.done .chk{background:var(--oxide);border-color:var(--oxide)}
 .heart{background:none;border:0;color:#bbb4aa;font-size:15px;padding:2px 4px}
 .heart.on{color:var(--oxide)}
