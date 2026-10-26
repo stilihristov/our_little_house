@@ -90,8 +90,13 @@ const scene=new THREE.Scene();scene.background=new THREE.Color(BG);
 // axonometric camera orbiting the house: Q/E (or a sideways drag) turn it in 45° steps
 const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,200);
 const PHI=.6,TURN=Math.PI/4;let theta=TURN,tTheta=theta,thetaV=0,prevW=0,shift=0;
-scene.add(new THREE.HemisphereLight(0xfffaf0,0x8a8070,.5));
-const sun=new THREE.DirectionalLight(0xfff1dc,.8);sun.position.set(-7,11,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0006;
+const hemi=new THREE.HemisphereLight(0x9fa8c8,0x2a2018,.16);scene.add(hemi);
+// the mouse is a lamp: warm light that follows the cursor over the house
+const lamp=new THREE.PointLight(0xffffff,0,6.5,1.6);lamp.castShadow=true;lamp.shadow.mapSize.set(1024,1024);lamp.shadow.bias=-.002;lamp.position.set(0,2,0);scene.add(lamp);
+// touch screens have no hover: the lamp rests lit over the house and moves to wherever you tap
+const TOUCH=matchMedia("(hover:none)").matches;
+const lampT=new THREE.Vector3(0,2,0);let lampOn=TOUCH?.8:0;
+const sun=new THREE.DirectionalLight(0xc8d0ff,.1);sun.position.set(-7,11,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0006;
 Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8});scene.add(sun);
 
 const mats={};function M(c){return mats[c]||(mats[c]=new THREE.MeshStandardMaterial({color:c,roughness:.92,flatShading:true}))}
@@ -108,9 +113,8 @@ const picks=[];const STEP=.22;
 ROOMS.forEach(r=>{
   const y=r.lvl*STEP;const grp=new THREE.Group();grp.position.set(r.x*2,y,r.z*2);scene.add(grp);r.group=grp;r.y=y;
   const fl=box(3.96,.16+y,3.96,PL,0,-(y)/2,0,grp);fl.userData.room=r;picks.push(fl);r.floorMesh=fl;
-  // accent inlay
-  const inl=box(1.1,.02,.18,r.acc,-1.2+hash(r.id)*.6,.09,1.6-hash(r.id+"i")*.4,grp);
-  r.glow=new THREE.PointLight(0xfff0d8,0,5,2);r.glow.position.set(0,1.6,0);grp.add(r.glow);
+  box(1.1,.02,.18,r.acc,-1.2+hash(r.id)*.6,.09,1.6-hash(r.id+"i")*.4,grp);
+  r.glow=new THREE.PointLight(0xffb870,0,6,1.8);r.glow.position.set(0,1.5,0);r.glow.castShadow=!TOUCH;r.glow.shadow.mapSize.set(512,512);grp.add(r.glow);
 });
 
 // grotto walls: overlapping tilted planes along back and left
@@ -204,7 +208,7 @@ canvas.addEventListener("pointermove",e=>{
   const p=touches.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
   if(touches.size>=2)tTheta-=dx/touches.size*.01;   // summed over fingers = their average sideways motion
   else if(!twoFinger)hover(e)});
-canvas.addEventListener("pointerleave",()=>{hov=null});
+canvas.addEventListener("pointerleave",e=>{hov=null;if(e.pointerType==="mouse")lampOn=0});
 canvas.addEventListener("pointerup",e=>{
   if(e.pointerType==="mouse"){drag=null;
     if(moved<6&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)openRoom(r.id);else if(!r&&cur)closeRoom()}
@@ -219,12 +223,15 @@ addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)return closeRoom();
   const k=e.key.toLowerCase();if(k==="q")turn(-1);else if(k==="e")turn(1)});
 canvas.addEventListener("wheel",e=>{tDist=Math.min(20,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
 let hov=null;
-function hover(e){const r=roomUnder(e);hov=r;canvas.style.cursor=r?"pointer":"grab"}
+function hover(e){const r=roomUnder(e);hov=r;canvas.style.cursor="none";
+  aim(e);plane.constant=-2;if(ray.ray.intersectPlane(plane,hit)){lampT.set(hit.x,2,hit.z)}plane.constant=0;lampOn=r?1:TOUCH?.8:.35;}
 function loop(t){
   thetaV+=(tTheta-theta)*.014;thetaV*=.84;theta+=thetaV;
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
+  lamp.position.copy(lampT);lamp.intensity+=((cur?0:lampOn*2.2)-lamp.intensity)*.12;
   ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
     r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
+  hemi.intensity+=((cur||anim?.26:TOUCH?.22:.16)-hemi.intensity)*.04;
   let y=0;colSegs.forEach((m,i)=>{const tg=i<colVisible?1:.001;const s=m.scale.x+(tg-m.scale.x)*(.03+i*.002);m.scale.setScalar(s);m.position.y=y+m.userData.h*s/2;y+=m.userData.h*s});
   PIECES.forEach(p=>{const q=p.userData.t;
     p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
