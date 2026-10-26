@@ -63,7 +63,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS items(
               id TEXT PRIMARY KEY, room TEXT NOT NULL, text TEXT NOT NULL,
               done INTEGER NOT NULL DEFAULT 0, fav INTEGER NOT NULL DEFAULT 0,
-              ts INTEGER NOT NULL);
+              ts INTEGER NOT NULL, done_at INTEGER);
             CREATE TABLE IF NOT EXISTS layout(piece TEXT PRIMARY KEY, x REAL, z REAL, r REAL);
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
             """
@@ -73,8 +73,8 @@ def init_db() -> None:
             con.execute("INSERT INTO meta VALUES('started', ?)", (str(now),))
             for n, (room, text, done, fav) in enumerate(SEED_ITEMS):
                 con.execute(
-                    "INSERT INTO items(id,room,text,done,fav,ts) VALUES(?,?,?,?,?,?)",
-                    (f"seed{n}", room, text, int(done), int(fav), now - n),
+                    "INSERT INTO items(id,room,text,done,fav,ts,done_at) VALUES(?,?,?,?,?,?,?)",
+                    (f"seed{n}", room, text, int(done), int(fav), now - n, now if done else None),
                 )
 
 
@@ -82,7 +82,7 @@ def snapshot() -> dict:
     with db() as con:
         items = [
             {"id": r["id"], "room": r["room"], "text": r["text"], "done": bool(r["done"]),
-             "fav": bool(r["fav"]), "ts": r["ts"]}
+             "fav": bool(r["fav"]), "ts": r["ts"], "doneAt": r["done_at"]}
             for r in con.execute("SELECT * FROM items")
         ]
         layout = [dict(r) for r in con.execute("SELECT * FROM layout")]
@@ -157,6 +157,7 @@ class ItemPatch(BaseModel):
     text: Optional[str] = Field(default=None, min_length=1, max_length=200)
     done: Optional[bool] = None
     fav: Optional[bool] = None
+    doneAt: Optional[int] = None
 
 
 class Place(BaseModel):
@@ -203,8 +204,10 @@ async def add_item(body: NewItem, house_session: Optional[str] = Cookie(None)):
 async def update_item(item_id: str, body: ItemPatch, house_session: Optional[str] = Cookie(None)):
     require(house_session)
     fields = body.model_dump(exclude_unset=True)
-    cols = {"text": "text", "done": "done", "fav": "fav"}
+    cols = {"text": "text", "done": "done", "fav": "fav", "doneAt": "done_at"}
     sets = [(cols[k], int(v) if isinstance(v, bool) else v) for k, v in fields.items()]
+    if "done" in fields and "doneAt" not in fields:
+        sets.append(("done_at", int(time.time() * 1000) if fields["done"] else None))
     if not sets:
         return {"ok": True}
     with db() as con:
