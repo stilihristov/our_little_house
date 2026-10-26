@@ -159,9 +159,20 @@ for(let i=0;i<22;i++){const s=1-i*.028,h=.18+hash("ch"+i)*.22;const c=(i%5===3)?
   const m=new THREE.Mesh(i%3===1?new THREE.CylinderGeometry(.42*s,.42*s,h,3):new THREE.BoxGeometry(.7*s,h,.7*s),M(c));
   m.rotation.y=hash("cr"+i)*Math.PI;m.position.x=(hash("cx"+i)-.5)*.18;m.position.z=(hash("cz"+i)-.5)*.18;m.castShadow=m.receiveShadow=true;m.userData.h=h;m.scale.setScalar(.001);column.add(m);colSegs.push(m)}
 let colVisible=0;
+// room spires: grow with ticked-off items in that room
+const spireSpots={movies:[1.5,-1.5],food:[1.5,.9],dates:[1.4,1.4],trips:[-1.5,1.4]};
+ROOMS.forEach(r=>{const sp=new THREE.Group();const s=spireSpots[r.id];sp.position.set(s[0],.08,s[1]);r.group.add(sp);r.spire=sp;r.spireN=-1});
+function buildSpire(r,n){if(n===r.spireN)return;const old=r.spireN<0?0:r.spireN;r.spireN=n;
+  while(sp=r.spire.children[n])r.spire.remove(sp);
+  let y=r.spire.children.reduce((a,m)=>a+m.userData.h,0);
+  for(let i=r.spire.children.length;i<Math.min(n,24);i++){const h=.12+hash(r.id+i)*.1,w=.32-i*.008;const c=i%4===2?r.acc:(i%2?PL:PL3);
+    const m=box(w,h,w,c,(hash(r.id+"x"+i)-.5)*.06,y+h/2,(hash(r.id+"z"+i)-.5)*.06,r.spire,0,hash(r.id+"r"+i)*1.6,0);m.userData.h=h;
+    if(i>=old){m.scale.setScalar(.001);m.userData.grow=1}y+=h}}
+var sp;
 
 function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0;
-  colVisible=Math.min(colSegs.length,3+Math.floor(Math.sqrt(days)*2.2));}
+  colVisible=Math.min(colSegs.length,3+Math.floor(Math.sqrt(days)*2.2));
+  ROOMS.forEach(r=>buildSpire(r,items.filter(i=>i.room===r.id&&i.done).length));}
 
 let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
@@ -197,7 +208,8 @@ const tmp=new THREE.Vector3();
 function loop(t){
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
   ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
-    tmp.set(r.x*2,r.y+1.9,r.z*2).project(camera);r.tag.style.left=(tmp.x*.5+.5)*innerWidth+"px";r.tag.style.top=(-tmp.y*.5+.5)*innerHeight+"px";r.tag.hidden=!!cur||tmp.z>1});
+    tmp.set(r.x*2,r.y+1.9,r.z*2).project(camera);r.tag.style.left=(tmp.x*.5+.5)*innerWidth+"px";r.tag.style.top=(-tmp.y*.5+.5)*innerHeight+"px";r.tag.hidden=!!cur||tmp.z>1;
+    r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
   let y=0;colSegs.forEach((m,i)=>{const tg=i<colVisible?1:.001;const s=m.scale.x+(tg-m.scale.x)*(.03+i*.002);m.scale.setScalar(s);m.position.y=y+m.userData.h*s/2;y+=m.userData.h*s});
   PIECES.forEach(p=>{const q=p.userData.t,lift=(grab&&grab.p===p)?.25:(hovPiece===p?.08:0);
     p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]+lift-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
