@@ -161,8 +161,8 @@ class ItemPatch(BaseModel):
 
 
 class Place(BaseModel):
-    x: float
-    z: float
+    x: float = Field(ge=-4, le=4)
+    z: float = Field(ge=-4, le=4)
     r: float
 
 
