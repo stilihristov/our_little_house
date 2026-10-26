@@ -48,14 +48,6 @@ li.done .chk{background:var(--oxide);border-color:var(--oxide)}
 .empty{color:var(--muted);padding:20px 0;font-size:14px}
 #status{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));color:#999;font-size:12px;max-width:70%;z-index:4;margin:0}
 body.inroom #status{display:none}
-.tools{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 32px)}
-.tools p{margin:0;background:var(--paper);border:1px solid var(--ink);padding:7px 10px;font-size:12px}
-.solid,.ghost{border:1px solid var(--ink);padding:9px 14px;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
-.solid{background:var(--ink);color:var(--paper)}.solid:hover,.solid[aria-pressed=true]{background:var(--oxide);border-color:var(--oxide)}
-.ghost{background:var(--paper);color:var(--ink)}.ghost:hover{background:var(--ink);color:var(--paper)}
-body.arranging .tag{display:none}
-body.arranging #status{display:none}
-body.inroom .tools{display:none}
 .login{position:fixed;inset:0;background:rgba(228,223,212,.86);backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px}
 .login form{background:var(--paper);border:1px solid var(--ink);padding:24px;display:grid;gap:10px;width:min(340px,100%)}
 .login h2{font-family:var(--display);font-weight:400;font-size:34px;margin:0 0 6px}.login h2 em{color:var(--oxide)}
@@ -74,7 +66,6 @@ body.inroom .tools{display:none}
   <ul id="list"></ul>
 </aside>
 <p id="status"></p>
-<div class="tools"><p id="hint" hidden>Drag a piece to move it. Tap it to turn it.</p><button id="reset" class="ghost" hidden>Reset layout</button><button id="arrange" class="solid" aria-pressed="false">Arrange</button></div>
 
 <div id="login" class="login" hidden><form id="loginForm"><h2>Our <em>little</em> house</h2><label for="pw">House password</label><input id="pw" type="password" autocomplete="current-password" required><button class="solid">Come in</button><p id="loginErr" role="alert"></p></form></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -132,7 +123,7 @@ box(3.2,.7,.1,PL3,-1.9,.35,0,scene,0,.04,0);box(1.6,1.1,.1,PL,2.6,.55+STEP,-.05)
 // cantilevered roof fragments
 box(3.4,.08,1.6,PL,-2.4,2.9,-3.1,scene,.05,.1,0);box(1.8,.08,2.6,PL2,-3.2,2.4,1.4,scene,0,-.08,.06);
 
-// ---- movable furniture: each piece is a group in world space, origin on the floor ----
+// ---- furniture: each piece is a group in world space, origin on the floor; position comes from the server layout ----
 function roomAt(x,z){return ROOMS.find(r=>Math.sign(x||1)===r.x&&Math.sign(z||1)===r.z)}
 const PIECES=[],pieceById={};
 function piece(id,room,lx,lz,build){const r=ROOMS.find(q=>q.id===room);const p=new THREE.Group();p.userData={piece:id,home:[r.x*2+lx,r.z*2+lz,0]};
@@ -152,7 +143,7 @@ piece("table","food",-.2,.5,p=>{box(1.2,.08,1.2,WOOD,0,.55,0,p,0,.4,0);box(.12,.
 piece("stair","dates",-.6,.1,p=>{for(let i=0;i<5;i++)box(.9,.18*(i+1),.4,i%2?PL:PL2,0,.09*(i+1),.8-i*.4,p)});
 piece("sphere","dates",.9,.1,p=>mesh(new THREE.SphereGeometry(.38,20,14),0xb5452f,0,.46,0,p));
 piece("bed","dates",.5,-1.1,p=>box(1.4,.3,1.8,PL,0,.15,0,p,0,-.2,0));
-// garden: the growing Merz column (movable too)
+// garden: the growing Merz column
 const column=new THREE.Group();piece("column","trips",.5,-.5,p=>p.add(column));
 const colSegs=[];
 for(let i=0;i<22;i++){const s=1-i*.028,h=.18+hash("ch"+i)*.22;const c=(i%5===3)?[0xb5452f,0x2f4fa8,0xc9952f,INK][i%4]:(i%2?PL:PL2);
@@ -195,36 +186,44 @@ function place(){const c=Math.cos(PHI);
 function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);tDist=cur?7.5:12}
 addEventListener("resize",resize);resize();dist=tDist;
 
-let drag=null,moved=0,arrange=false,grab=null,hovPiece=null;
+let drag=null,moved=0,anim=null;
 const ray=new THREE.Raycaster(),v2=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();
 function aim(e){v2.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);
   const o=new THREE.Vector3(v2.x,v2.y,-1).unproject(camera),f=new THREE.Vector3(v2.x,v2.y,1).unproject(camera);ray.ray.origin.copy(o);ray.ray.direction.copy(f.sub(o).normalize());ray.near=0;ray.far=Infinity;ray.camera=camera}
 function pick(e){aim(e);const h=ray.intersectObjects(picks)[0];return h&&h.object.userData.room}
-function pickPiece(e){aim(e);const h=ray.intersectObjects(PIECES,true)[0];if(!h)return null;let o=h.object;while(o&&!o.userData.piece)o=o.parent;return o}
-canvas.addEventListener("pointerdown",e=>{moved=0;canvas.setPointerCapture(e.pointerId);
-  if(arrange){const p=pickPiece(e);if(p){plane.constant=-p.position.y;aim(e);ray.ray.intersectPlane(plane,hit);grab={p,dx:p.position.x-hit.x,dz:p.position.z-hit.z};return}}
-  drag={x:e.clientX,y:e.clientY}});
+function roomUnder(e){aim(e);if(!ray.ray.intersectPlane(plane,hit))return null;if(Math.abs(hit.x)>4||Math.abs(hit.z)>4)return null;return roomAt(hit.x,hit.z)}
+// mouse: drag sideways to turn. touch: one finger taps rooms and moves the lamp, two fingers swipe sideways to turn
+const touches=new Map();let twoFinger=false;
+const snapTurn=()=>{tTheta=Math.round(tTheta/TURN)*TURN};
+canvas.addEventListener("pointerdown",e=>{try{canvas.setPointerCapture(e.pointerId)}catch(err){}
+  if(e.pointerType==="mouse"){moved=0;drag={x:e.clientX,y:e.clientY};return}
+  touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(touches.size===1){moved=0;twoFinger=false;hover(e)}else twoFinger=true});
 canvas.addEventListener("pointermove",e=>{
-  if(grab){moved+=Math.abs(e.movementX)+Math.abs(e.movementY);aim(e);if(ray.ray.intersectPlane(plane,hit)){const t=grab.p.userData.t;setPiece(grab.p,hit.x+grab.dx,hit.z+grab.dz,t[3])}return}
-  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;drag={x:e.clientX,y:e.clientY}}
-  else hover(e)});
+  if(e.pointerType==="mouse"){if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);drag={x:e.clientX,y:e.clientY};if(moved>=6)tTheta-=dx*.008}hover(e);return}
+  const p=touches.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+  if(touches.size>=2)tTheta-=dx/touches.size*.01;   // summed over fingers = their average sideways motion
+  else if(!twoFinger)hover(e)});
+canvas.addEventListener("pointerleave",()=>{hov=null});
 canvas.addEventListener("pointerup",e=>{
-  if(grab){const p=grab.p,t=p.userData.t;if(moved<6)setPiece(p,t[0],t[2],t[3]+Math.PI/4);savePiece(p);grab=null;return}
-  if(moved<6&&!arrange){const r=pick(e);if(r)openRoom(r.id);else if(cur)closeRoom()}drag=null});
-canvas.addEventListener("wheel",e=>{tDist=Math.min(24,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
-let hov=null;function hover(e){if(arrange){hovPiece=pickPiece(e);hov=null;canvas.style.cursor=hovPiece?"move":"grab";return}hovPiece=null;hov=pick(e);canvas.style.cursor=hov?"pointer":"grab"}
-async function savePiece(p){if(!db)return;const t=p.userData.t;try{await api("PUT","/api/layout/"+p.userData.piece,{x:+t[0].toFixed(3),z:+t[2].toFixed(3),r:+t[3].toFixed(4)})}catch(e){status("Couldn't save the new layout.")}}
-const arrBtn=$("#arrange"),resetBtn=$("#reset");
-arrBtn.onclick=()=>{arrange=!arrange;if(arrange&&cur)closeRoom();arrBtn.setAttribute("aria-pressed",arrange);arrBtn.textContent=arrange?"Done":"Arrange";$("#hint").hidden=!arrange;resetBtn.hidden=!arrange;document.body.classList.toggle("arranging",arrange)};
-resetBtn.onclick=async()=>{PIECES.forEach(p=>{const h=p.userData.home;setPiece(p,h[0],h[1],0)});if(db)try{await api("DELETE","/api/layout")}catch(e){}};
-
+  if(e.pointerType==="mouse"){drag=null;
+    if(moved<6&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)openRoom(r.id);else if(!r&&cur)closeRoom()}
+    else if(moved>=6)snapTurn();return}
+  if(!touches.delete(e.pointerId))return;
+  if(twoFinger){if(!touches.size){snapTurn();twoFinger=false}return}
+  if(moved<10&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)openRoom(r.id);else if(!r&&cur)closeRoom()}});
+canvas.addEventListener("pointercancel",e=>{touches.delete(e.pointerId);if(!touches.size&&twoFinger){snapTurn();twoFinger=false}});
+canvas.addEventListener("wheel",e=>{tDist=Math.min(20,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
+let hov=null;
+function hover(e){const r=roomUnder(e);hov=r;canvas.style.cursor=r?"pointer":"grab"}
 function loop(t){
+  thetaV+=(tTheta-theta)*.014;thetaV*=.84;theta+=thetaV;
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
   ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
     r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
   let y=0;colSegs.forEach((m,i)=>{const tg=i<colVisible?1:.001;const s=m.scale.x+(tg-m.scale.x)*(.03+i*.002);m.scale.setScalar(s);m.position.y=y+m.userData.h*s/2;y+=m.userData.h*s});
-  PIECES.forEach(p=>{const q=p.userData.t,lift=(grab&&grab.p===p)?.25:(hovPiece===p?.08:0);
-    p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]+lift-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
+  PIECES.forEach(p=>{const q=p.userData.t;
+    p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
   column.rotation.y=Math.sin(t*.0002)*.05;
   shardG.children.forEach(c=>{if(c.userData.grow){const s=c.scale.x+(1-c.scale.x)*.06;c.scale.setScalar(s);if(s>.99)c.userData.grow=0}});
   renderer.render(scene,camera);requestAnimationFrame(loop)}
@@ -261,8 +260,8 @@ updGrowth();
 async function api(method,url,body){const r=await fetch(url,{method,headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,credentials:"same-origin"});
   if(r.status===401){showLogin();throw new Error("auth")}if(!r.ok)throw new Error(r.status);return r.status===204?null:r.json()}
 function applyState(st){items=st.items||[];started=st.started||null;const seen=new Set();
-  (st.layout||[]).forEach(v=>{const p=pieceById[v.piece];if(!p)return;seen.add(v.piece);if(grab&&grab.p===p)return;setPiece(p,+v.x||0,+v.z||0,+v.r||0)});
-  PIECES.forEach(p=>{if(!seen.has(p.userData.piece)&&!(grab&&grab.p===p)){const h=p.userData.home;setPiece(p,h[0],h[1],0)}});render()}
+  (st.layout||[]).forEach(v=>{const p=pieceById[v.piece];if(!p)return;seen.add(v.piece);setPiece(p,+v.x||0,+v.z||0,+v.r||0)});
+  PIECES.forEach(p=>{if(!seen.has(p.userData.piece)){const h=p.userData.home;setPiece(p,h[0],h[1],0)}});render()}
 let ws=null,retry=1000;
 function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
   ws.onopen=()=>{retry=1000;db=true;status("")};
