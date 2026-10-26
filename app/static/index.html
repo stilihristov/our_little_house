@@ -18,6 +18,7 @@ header{position:fixed;left:16px;top:calc(16px + env(safe-area-inset-top,0px));po
 h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,5vw,48px);margin:0;line-height:.95;text-wrap:balance}
 h1 em{color:var(--oxide)}
 header p{margin:.5em 0 0;color:var(--muted);font-size:12px;letter-spacing:.02em}
+header .grow{color:var(--ink);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;font-variant-numeric:tabular-nums}
 .tag{position:fixed;transform:translate(-50%,-100%);cursor:pointer;background:var(--ink);border:0;color:var(--paper);font:700 10px var(--body);letter-spacing:.16em;text-transform:uppercase;padding:6px 8px 6px 10px;white-space:nowrap;display:flex;gap:8px;align-items:center}
 .tag b{background:var(--oxide);color:var(--paper);padding:1px 5px;font-variant-numeric:tabular-nums}
 .tag:hover,.tag:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
@@ -67,7 +68,7 @@ body.inroom .tools{display:none}
 </style>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
-<header><h1>Our <em>little</em> house</h1><p>Drag to look around. Tap a room to go inside.</p></header>
+<header><h1>Our <em>little</em> house</h1><p>Drag to look around. Tap a room to go inside.</p><p id="grow" class="grow"></p></header>
 <div id="tags"></div>
 <aside id="panel" aria-hidden="true">
   <div class="ph"><div><small id="pk"></small><h2 id="pt"></h2><p id="pd"></p></div><button class="x" id="close" aria-label="Back to the house">×</button></div>
@@ -181,7 +182,8 @@ function growShards(done){const key=done.map(i=>i.id).join();if(key===shardKey)r
 function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0;
   colVisible=Math.min(colSegs.length,3+Math.floor(Math.sqrt(days)*2.2));
   ROOMS.forEach(r=>buildSpire(r,items.filter(i=>i.room===r.id&&i.done).length));
-  const done=items.filter(i=>i.done).sort((a,b)=>(a.ts||0)-(b.ts||0));growShards(done);}
+  const done=items.filter(i=>i.done).sort((a,b)=>(a.ts||0)-(b.ts||0));growShards(done);
+  $("#grow").textContent=started?`Day ${Math.floor(days)+1} · ${done.length} done · column ${colVisible} high`:""}
 
 let theta=.7,phi=.98,dist=14,target=new THREE.Vector3(0,.4,0),tTarget=target.clone(),tDist=dist;
 function place(){camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(target)}
