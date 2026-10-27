@@ -176,21 +176,20 @@ for(let i=0;i<22;i++){const s=1-i*.028,h=.18+hash("ch"+i)*.22;const c=(i%5===3)?
 let colVisible=0;
 // room spires: grow with ticked-off items in that room
 const spireSpots={movies:[1.5,-1.5],food:[1.5,.9],dates:[1.4,1.4],trips:[-1.5,1.4]};
-ROOMS.forEach(r=>{const sp=new THREE.Group();const s=spireSpots[r.id];sp.position.set(s[0],.08,s[1]);r.group.add(sp);r.spire=sp;r.spireN=-1});
+ROOMS.forEach(r=>{const sp=new THREE.Group();const s=spireSpots[r.id];sp.position.set(s[0],.08,s[1]);sp.userData={bx:s[0],bz:s[1],wx:r.x*2+s[0],wz:r.z*2+s[1],mass:1.3};r.group.add(sp);r.spire=sp;r.spireN=-1});
 function buildSpire(r,n){if(n===r.spireN)return;const old=r.spireN<0?0:r.spireN;r.spireN=n;
-  while(sp=r.spire.children[n])r.spire.remove(sp);
+  while(r.spire.children[n])r.spire.remove(r.spire.children[n]);
   let y=r.spire.children.reduce((a,m)=>a+m.userData.h,0);
   for(let i=r.spire.children.length;i<Math.min(n,24);i++){const h=.12+hash(r.id+i)*.1,w=.32-i*.008;const c=i%4===2?r.acc:(i%2?PL:PL3);
     const m=box(w,h,w,c,(hash(r.id+"x"+i)-.5)*.06,y+h/2,(hash(r.id+"z"+i)-.5)*.06,r.spire,0,hash(r.id+"r"+i)*1.6,0);m.userData.h=h;
     if(i>=old){m.scale.setScalar(.001);m.userData.grow=1}y+=h}}
-var sp;
 // shards in the garden: one per ticked-off item anywhere
 const shardG=new THREE.Group();ROOMS[3].group.add(shardG);const SC=[0xb5452f,0x2f4fa8,0xc9952f,0x1d1c1a,0xefebe3];let shardKey="";
 function growShards(done){const key=done.map(i=>i.id).join();if(key===shardKey)return;const had=new Set(shardG.children.map(c=>c.userData.id));shardKey=key;
   while(shardG.children.length)shardG.remove(shardG.children[0]);
   done.slice(0,60).forEach(i=>{let x=-1.7+hash(i.id)*3.4,z=-1.7+hash(i.id+"z")*3.4;if(Math.hypot(x-.5,z+.5)<.7){x=x<.5?x-.7:x+.7}
     const t=new THREE.Mesh(new THREE.TetrahedronGeometry(.08+hash(i.id+"s")*.1),M(SC[Math.floor(hash(i.id+"c")*SC.length)]));
-    t.position.set(x,.12,z);t.rotation.set(hash(i.id+"a")*3,hash(i.id+"b")*3,0);t.castShadow=true;t.userData.id=i.id;
+    t.position.set(x,.12,z);t.rotation.set(hash(i.id+"a")*3,hash(i.id+"b")*3,0);t.castShadow=true;Object.assign(t.userData,{id:i.id,bx:x,bz:z,wx:2+x,wz:-2+z,mass:1.6,spin:t.rotation.y});
     if(!had.has(i.id)){t.scale.setScalar(.001);t.userData.grow=1}shardG.add(t)})}
 
 function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0;
@@ -284,6 +283,7 @@ function loop(t){
   ROOMS.forEach(r=>{const on=cur===r.id,a=anim&&anim.r===r,h=hov===r&&!cur;
     const tgt=a?2.6+Math.sin(t*.02)*.15:on?1.9+Math.sin(t*.003)*.12:h?1.1:0;
     r.glow.intensity+=(tgt-r.glow.intensity)*(a?.06:.1);
+    {const s=r.spire,u=s.userData;sway(u,u.wx,u.wz);s.position.x=u.bx+u.ox;s.position.z=u.bz+u.oz;lean(s,0,1.4)}
     r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
   hemi.intensity+=((cur||anim?.26:TOUCH?.22:.16)-hemi.intensity)*.04;
   for(let i=EMB.length-1;i>=0;i--){const m=EMB[i],u=m.userData;if(u.d>0){u.d--;continue}u.life++;
@@ -295,7 +295,8 @@ function loop(t){
     p.position.x+=(q[0]+u.ox-p.position.x)*.25;p.position.z+=(q[2]+u.oz-p.position.z)*.25;p.position.y+=(q[1]-p.position.y)*.2;
     u.yaw+=(q[3]-u.yaw)*.2;lean(p,u.yaw,u.piece==="column"?1.6:1)});
   column.rotation.y=Math.sin(t*.0002)*.05;
-  shardG.children.forEach(c=>{if(c.userData.grow){const s=c.scale.x+(1-c.scale.x)*.06;c.scale.setScalar(s);if(s>.99)c.userData.grow=0}});
+  shardG.children.forEach(c=>{const u=c.userData;sway(u,u.wx,u.wz);c.position.x=u.bx+u.ox;c.position.z=u.bz+u.oz;c.rotation.y=u.spin+u.ox*4;
+    if(u.grow){const s=c.scale.x+(1-c.scale.x)*.06;c.scale.setScalar(s);if(s>.99)c.userData.grow=0}});
   renderer.render(scene,camera);requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
