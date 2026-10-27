@@ -213,6 +213,8 @@ function place(){const c=Math.cos(PHI);
   // fit the plinth's diagonal (≈12.4) plus wall height, whatever the turn, so the house never clips
   const a=innerWidth/innerHeight,needH=(12.4*Math.sin(PHI)+3.6*c)/2*1.12,needW=6.2*1.1;
   const hh=Math.max(needH,needW/a)*dist/12,hw=hh*a;
+  // with the room panel open on a wide screen, slide the house left so the panel doesn't cover it
+  shift+=(((cur&&innerWidth>700)?Math.min(420,innerWidth)/innerWidth*hw:0)-shift)*.08;
   Object.assign(camera,{left:-hw+shift,right:hw+shift,top:hh,bottom:-hh});camera.updateProjectionMatrix()}
 function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);tDist=cur?7.5:12}
 addEventListener("resize",resize);resize();dist=tDist;
