@@ -31,6 +31,20 @@ Open http://localhost:8000 and enter the PIN. The database is created at `data/h
 
 Generate a secret with `python -c "import secrets; print(secrets.token_hex(32))"`.
 
+## Deploy option A: Fly.io (simplest)
+
+The machine sleeps when nobody is using it, so this costs very little.
+
+```bash
+cp fly.toml.example fly.toml                  # then set your own app name in it
+fly launch --no-deploy --copy-config
+fly volumes create house_data --size 1 --region fra
+fly secrets set HOUSE_PASSWORD=<your PIN> HOUSE_SECRET=$(python -c "import secrets;print(secrets.token_hex(32))")
+fly deploy
+```
+
+Keep it to one machine: SQLite lives on one volume, so don't scale out. `fly.toml` is git-ignored so your app name stays out of the repo.
+
 ## API
 
 All routes need the login cookie except `/api/login` and `/healthz`.
