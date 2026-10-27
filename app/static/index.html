@@ -456,7 +456,7 @@ function applyState(st){items=st.items||[];started=st.started||null;const seen=n
   (st.layout||[]).forEach(v=>{const p=pieceById[v.piece];if(!p)return;seen.add(v.piece);setPiece(p,+v.x||0,+v.z||0,+v.r||0)});
   PIECES.forEach(p=>{if(!seen.has(p.userData.piece)){const h=p.userData.home;setPiece(p,h[0],h[1],0)}});render()}
 let ws=null,retry=1000;
-function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+function connect(){if(ws&&ws.readyState<2)return;ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
   ws.onopen=()=>{retry=1000;db=true;status("")};
   ws.onmessage=e=>{try{applyState(JSON.parse(e.data))}catch(err){}};
   ws.onclose=ev=>{db=null;ws=null;if(ev.code===4401){relock();return}status("Reconnecting…");setTimeout(connect,retry);retry=Math.min(retry*2,15000)}}
