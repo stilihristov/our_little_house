@@ -7,6 +7,7 @@ app/
   main.py           FastAPI app: auth, REST API, WebSocket, SQLite
   static/index.html the whole 3D front end (three.js from a CDN)
 Dockerfile
+fly.toml.example    Fly.io config, copy it to fly.toml
 ```
 
 ## Run it locally
