@@ -141,6 +141,11 @@ box(.7,1.1,.04,0xb5452f,-1.6,1.4,-3.95,scene,0,.08,-.06);box(.9,.5,.04,0x2f4fa8,
 box(3.2,.7,.1,PL3,-1.9,.35,0,scene,0,.04,0);box(1.6,1.1,.1,PL,2.6,.55+STEP,-.05);box(.1,.9,2.6,PL3,0,.45,2.3);box(.1,1.4,1.8,PL,.05,.7+STEP*2,-2.6);
 // cantilevered roof fragments
 box(3.4,.08,1.6,PL,-2.4,2.9,-3.1,scene,.05,.1,0);box(1.8,.08,2.6,PL2,-3.2,2.4,1.4,scene,0,-.08,.06);
+// the same grotto along the front and right, so whichever sides end up behind always have walls standing
+for(let i=0;i<7;i++){const h=1.6+hash("f"+i)*1.8,w=1+hash("fw"+i)*1.4;box(w,h,.12,i%3?PL2:PL,3.6-i*1.2,h/2,4.1-hash("fz"+i)*.2,scene,0,(hash("fr"+i)-.5)*.35,(hash("ft"+i)-.5)*.25)}
+for(let i=0;i<6;i++){const h=1.2+hash("r"+i)*1.6,w=1+hash("rw"+i)*1.4;box(.12,h,w,i%2?PL2:PL,4.1-hash("rz"+i)*.2,h/2,-3.6+i*1.35,scene,(hash("rt"+i)-.5)*.25,(hash("rr"+i)-.5)*.3,0)}
+box(.8,.9,.04,0x2f4fa8,1.2,1.3,3.95,scene,0,-.06,.05);box(.5,.5,.04,INK,-2.2,2.3,3.9,scene,0,.1,-.2);box(.04,1,.5,0xb5452f,3.95,1.5,1.4,scene);box(.04,.6,.9,0xc9952f,3.95,2,-2.2,scene,.06,0,0);
+box(3,.08,1.4,PL,2.4,2.8,3.1,scene,-.05,-.1,0);box(1.6,.08,2.4,PL2,3.2,2.5,-1.6,scene,0,.08,-.06);
 
 // ---- furniture: each piece is a group in world space, origin on the floor; position comes from the server layout ----
 function roomAt(x,z){return ROOMS.find(r=>Math.sign(x||1)===r.x&&Math.sign(z||1)===r.z)}
