@@ -238,11 +238,11 @@ canvas.addEventListener("pointermove",e=>{
 canvas.addEventListener("pointerleave",e=>{hov=null;if(e.pointerType==="mouse")lampOn=0});
 canvas.addEventListener("pointerup",e=>{
   if(e.pointerType==="mouse"){drag=null;
-    if(moved<6&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)openRoom(r.id);else if(!r&&cur)closeRoom()}
+    if(moved<6&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)enterRoom(r);else if(!r&&cur)closeRoom()}
     else if(moved>=6)snapTurn();return}
   if(!touches.delete(e.pointerId))return;
   if(twoFinger){if(!touches.size){snapTurn();twoFinger=false}return}
-  if(moved<10&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)openRoom(r.id);else if(!r&&cur)closeRoom()}});
+  if(moved<10&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)enterRoom(r);else if(!r&&cur)closeRoom()}});
 canvas.addEventListener("pointercancel",e=>{touches.delete(e.pointerId);if(!touches.size&&twoFinger){snapTurn();twoFinger=false}});
 function turn(d){tTheta=Math.round(tTheta/TURN)*TURN+d*TURN}
 addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)return closeRoom();
@@ -251,10 +251,15 @@ addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)return closeRoom();
 canvas.addEventListener("wheel",e=>{tDist=Math.min(20,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
 let hov=null;
 function hover(e){const r=roomUnder(e);hov=r;canvas.style.cursor="none";
-  aim(e);plane.constant=-3.4;if(ray.ray.intersectPlane(plane,hit)){anchor.set(hit.x,3.4,hit.z)}plane.constant=0;lampOn=r?1:TOUCH?.8:.35;}
+  aim(e);plane.constant=-3.4;if(ray.ray.intersectPlane(plane,hit)){anchor.set(hit.x,3.4,hit.z)}plane.constant=0;lampOn=r?1:TOUCH?.8:.35;
+  $("#veil").style.setProperty("--vx",e.clientX/innerWidth*100+"%");$("#veil").style.setProperty("--vy",e.clientY/innerHeight*100+"%")}
+function enterRoom(r){if(cur)closeRoom();
+  anim={r,t:0};$("#veil").classList.add("on");
+  tTarget.set(r.x*2,r.y+.3,r.z*2);tDist=7.5;
+  setTimeout(()=>{openRoom(r.id);anim=null},1100)}
 function loop(t){
   thetaV+=(tTheta-theta)*.014;thetaV*=.84;theta+=thetaV;
-  target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
+  target.lerp(tTarget,anim?.045:.08);dist+=(tDist-dist)*(anim?.04:.08);place();
   {walls.forEach(m=>{const u=m.userData;u.s+=((nearCam(u,theta)?.04:1)-u.s)*u.rate;
      if(u.thin){m.scale.setScalar(Math.max(u.s,.001));m.visible=u.s>.06}else{m.scale.y=u.s;m.position.y=u.y0*u.s}})}
   {const rest=anchor.clone();rest.y-=CORD;bulbV.addScaledVector(rest.sub(bulbP),.035);bulbV.multiplyScalar(.9);bulbP.add(bulbV);
@@ -264,7 +269,9 @@ function loop(t){
    pendant.position.copy(bulbP);pendant.quaternion.copy(cord.quaternion);lampT.copy(bulbP);lampT.y-=.1;
    pendant.visible=cord.visible=!cur;halo.material.opacity=.4+lampOn*.6}
   lamp.position.copy(lampT);lamp.intensity+=((cur?0:lampOn*2.2)-lamp.intensity)*.12;
-  ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
+  ROOMS.forEach(r=>{const on=cur===r.id,a=anim&&anim.r===r,h=hov===r&&!cur;
+    const tgt=a?2.6+Math.sin(t*.02)*.15:on?1.9+Math.sin(t*.003)*.12:h?1.1:0;
+    r.glow.intensity+=(tgt-r.glow.intensity)*(a?.06:.1);
     r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
   hemi.intensity+=((cur||anim?.26:TOUCH?.22:.16)-hemi.intensity)*.04;
   let y=0;colSegs.forEach((m,i)=>{const tg=i<colVisible?1:.001;const s=m.scale.x+(tg-m.scale.x)*(.03+i*.002);m.scale.setScalar(s);m.position.y=y+m.userData.h*s/2;y+=m.userData.h*s});
@@ -279,8 +286,8 @@ requestAnimationFrame(loop);
 function openRoom(id){const r=ROOMS.find(x=>x.id===id);cur=id;tTarget.set(r.x*2,r.y+.3,r.z*2);tDist=7.5;
   $("#pk").textContent=r.name;$("#pt").textContent=r.kind;$("#pd").textContent=r.hint;$("#newItem").placeholder=r.ph;
   $("#panel").classList.add("open");document.body.classList.add("inroom");$("#panel").setAttribute("aria-hidden","false");render()}
-function closeRoom(){cur=null;tTarget.set(0,.4,0);resize();$("#panel").classList.remove("open");document.body.classList.remove("inroom");$("#panel").setAttribute("aria-hidden","true")}
-$("#close").onclick=closeRoom;addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)closeRoom()});
+function closeRoom(){cur=null;$("#veil").classList.remove("on");tTarget.copy(HOME);resize();$("#panel").classList.remove("open");document.body.classList.remove("inroom");$("#panel").setAttribute("aria-hidden","true")}
+$("#close").onclick=()=>closeRoom();
 document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.dataset.f;document.querySelectorAll(".filters button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
 
 function render(){updGrowth();if(!cur)return;const ul=$("#list");ul.innerHTML="";
