@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
 PASSWORD = os.environ.get("HOUSE_PASSWORD", "change-me")
 SECRET = os.environ.get("HOUSE_SECRET") or secrets.token_hex(32)  # set it in production so logins survive restarts
+ON_FLY = bool(os.environ.get("FLY_APP_NAME"))  # Fly sets this on its machines
 COOKIE = "house_session"
 COOKIE_DAYS = 180
 STATIC = Path(__file__).parent / "static"
@@ -173,7 +174,10 @@ ALL_MAX, ALL_WINDOW = 30, 60 * 60       # everyone together: 30 wrong tries per 
 
 
 def client_ip(request: Request) -> str:
-    return request.headers.get("fly-client-ip") or (request.client.host if request.client else "?")
+    # only trust Fly's header behind Fly's proxy; anywhere else a client could set it to dodge the limit
+    if ON_FLY and request.headers.get("fly-client-ip"):
+        return request.headers["fly-client-ip"]
+    return request.client.host if request.client else "?"
 
 
 def recent(key: str, window: int) -> list[float]:
