@@ -45,6 +45,22 @@ fly deploy
 
 Keep it to one machine: SQLite lives on one volume, so don't scale out. `fly.toml` is git-ignored so your app name stays out of the repo.
 
+## Deploy option B: any small VPS (e.g. Hetzner)
+
+```bash
+docker build -t little-house .
+docker run -d --name house --restart unless-stopped -p 127.0.0.1:8000:8000 \
+  -v house-data:/data -e HOUSE_PASSWORD=... -e HOUSE_SECRET=... -e HOUSE_HTTPS=1 little-house
+```
+
+Put Caddy in front for automatic HTTPS (it proxies WebSockets without extra config):
+
+```
+house.yourdomain.com {
+    reverse_proxy 127.0.0.1:8000
+}
+```
+
 ## API
 
 All routes need the login cookie except `/api/login` and `/healthz`.
