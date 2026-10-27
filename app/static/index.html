@@ -64,18 +64,33 @@ body.inroom #status{display:none}
 /* PIN gate: 4-digit input, curtains that open on success */
 #gate{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;gap:28px;align-items:center;justify-content:center;transition:opacity .6s ease}
 #gate.gone{opacity:0;pointer-events:none}
+/* black velvet curtains: the outer .curt opens, the fabric layer (::before) sways in a slight breeze */
+.curt{position:fixed;top:-2vh;bottom:-2vh;width:52vw;z-index:19;transition:transform 2.1s cubic-bezier(.65,0,.25,1)}
+.curt::before{content:"";position:absolute;top:0;bottom:0;left:-3vw;right:-3vw;background:
+ repeating-linear-gradient(90deg,#030303 0,#1c1c1c 2.2vw,#3a3a3a 3.1vw,#141414 4.4vw,#030303 6vw),#060606;
+ box-shadow:inset 0 -40px 80px #000,inset 0 60px 90px #000;transform-origin:50% 0;animation:breeze 7s ease-in-out infinite}
+#curtR::before{animation-duration:8.6s;animation-delay:-3.2s}
+@keyframes breeze{0%,100%{transform:skewX(0) scaleX(1);background-position-x:0}
+ 28%{transform:skewX(1.1deg) scaleX(1.012);background-position-x:.5vw}
+ 55%{transform:skewX(-.5deg) scaleX(.996);background-position-x:-.3vw}
+ 78%{transform:skewX(.6deg) scaleX(1.006);background-position-x:.2vw}}
+.curt::after{content:"";position:absolute;inset:0 -3vw;background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0) 30%,rgba(0,0,0,.6))}
+#curtL{left:0}#curtR{right:0}
+body.open #curtL{transform:translateX(-100%) skewX(6deg)}body.open #curtR{transform:translateX(100%) skewX(-6deg)}
+body.open .curt{transition-delay:.25s}
 #gf{display:flex;border-bottom:1px solid #e8e8e8;padding:0;margin:0}
 #pin{background:none;border:0;color:#f0f0f0;font:28px var(--display);letter-spacing:.6em;text-align:center;width:7em;padding:8px 0 8px .6em;outline:none}
 #pin::placeholder{color:#444}
 #gf button{background:none;border:0;color:#e8e8e8;font-size:22px;padding:0 6px}
 #gf.no{animation:shake .4s}@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 #gmsg{color:#888;font-size:12px;min-height:1.2em;margin:-14px 0 0;letter-spacing:.04em}
-@media (prefers-reduced-motion:reduce){#panel{transition:none}}
+@media (prefers-reduced-motion:reduce){.curt::before{animation:none}.curt{transition-duration:.01s}#panel{transition:none}}
 </style>
 </head>
 <body>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
+<div id="curtL" class="curt"></div><div id="curtR" class="curt"></div>
 <div id="gate"><form id="gf" autocomplete="off"><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" aria-label="PIN" placeholder="••••" autofocus><button aria-label="Enter">→</button></form>
 <p id="gmsg" role="alert"></p>
 </div>
