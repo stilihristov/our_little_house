@@ -61,6 +61,14 @@ house.yourdomain.com {
 }
 ```
 
+## Backups
+
+Everything is in one file. Copy it while the app runs:
+
+```bash
+sqlite3 /data/house.db ".backup '/data/house-$(date +%F).db'"
+```
+
 ## API
 
 All routes need the login cookie except `/api/login` and `/healthz`.
