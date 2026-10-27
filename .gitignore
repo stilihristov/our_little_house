@@ -5,3 +5,4 @@ __pycache__/
 *.db
 .DS_Store
 fly.toml
+model/*.3dm
