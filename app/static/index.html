@@ -223,6 +223,11 @@ function aim(e){v2.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);
   const o=new THREE.Vector3(v2.x,v2.y,-1).unproject(camera),f=new THREE.Vector3(v2.x,v2.y,1).unproject(camera);ray.ray.origin.copy(o);ray.ray.direction.copy(f.sub(o).normalize());ray.near=0;ray.far=Infinity;ray.camera=camera}
 function pick(e){aim(e);const h=ray.intersectObjects(picks)[0];return h&&h.object.userData.room}
 function roomUnder(e){aim(e);if(!ray.ray.intersectPlane(plane,hit))return null;if(Math.abs(hit.x)>4||Math.abs(hit.z)>4)return null;return roomAt(hit.x,hit.z)}
+// warm embers released when a room is opened
+const EMB=[];const emberGeo=new THREE.SphereGeometry(.035,6,4);
+function release(r){for(let i=0;i<40;i++){const m=new THREE.Mesh(emberGeo,new THREE.MeshBasicMaterial({color:i%3?0xffcf8a:0xff9a52,transparent:true,opacity:0}));
+  m.position.set(r.x*2+(Math.random()-.5)*3,r.y+.1+Math.random()*.3,r.z*2+(Math.random()-.5)*3);
+  m.userData={v:.004+Math.random()*.008,ph:Math.random()*6.28,life:0,max:120+Math.random()*120,d:Math.random()*18};scene.add(m);EMB.push(m)}}
 // mouse: drag sideways to turn. touch: one finger taps rooms and moves the lamp, two fingers swipe sideways to turn
 const touches=new Map();let twoFinger=false;
 const snapTurn=()=>{tTheta=Math.round(tTheta/TURN)*TURN};
@@ -254,7 +259,7 @@ function hover(e){const r=roomUnder(e);hov=r;canvas.style.cursor="none";
   aim(e);plane.constant=-3.4;if(ray.ray.intersectPlane(plane,hit)){anchor.set(hit.x,3.4,hit.z)}plane.constant=0;lampOn=r?1:TOUCH?.8:.35;
   $("#veil").style.setProperty("--vx",e.clientX/innerWidth*100+"%");$("#veil").style.setProperty("--vy",e.clientY/innerHeight*100+"%")}
 function enterRoom(r){if(cur)closeRoom();
-  anim={r,t:0};$("#veil").classList.add("on");
+  anim={r,t:0};release(r);$("#veil").classList.add("on");
   tTarget.set(r.x*2,r.y+.3,r.z*2);tDist=7.5;
   setTimeout(()=>{openRoom(r.id);anim=null},1100)}
 function loop(t){
@@ -274,6 +279,10 @@ function loop(t){
     r.glow.intensity+=(tgt-r.glow.intensity)*(a?.06:.1);
     r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
   hemi.intensity+=((cur||anim?.26:TOUCH?.22:.16)-hemi.intensity)*.04;
+  for(let i=EMB.length-1;i>=0;i--){const m=EMB[i],u=m.userData;if(u.d>0){u.d--;continue}u.life++;
+    m.position.y+=u.v;m.position.x+=Math.sin(t*.002+u.ph)*.004;m.position.z+=Math.cos(t*.0017+u.ph)*.004;
+    const k=u.life/u.max;m.material.opacity=Math.min(1,k*5)*(1-k);
+    if(u.life>u.max){scene.remove(m);m.material.dispose();EMB.splice(i,1)}}
   let y=0;colSegs.forEach((m,i)=>{const tg=i<colVisible?1:.001;const s=m.scale.x+(tg-m.scale.x)*(.03+i*.002);m.scale.setScalar(s);m.position.y=y+m.userData.h*s/2;y+=m.userData.h*s});
   PIECES.forEach(p=>{const q=p.userData.t;
     p.position.x+=(q[0]-p.position.x)*.25;p.position.z+=(q[2]-p.position.z)*.25;p.position.y+=(q[1]-p.position.y)*.2;p.rotation.y+=(q[3]-p.rotation.y)*.2});
