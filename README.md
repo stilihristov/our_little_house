@@ -33,7 +33,7 @@ Generate a secret with `python -c "import secrets; print(secrets.token_hex(32))"
 
 All routes need the login cookie except `/api/login` and `/healthz`.
 
-- `POST /api/login` `{password}`
+- `POST /api/login` `{password}` (5 wrong tries per device per 15 minutes, 30 overall per hour)
 - `GET /api/state` returns `{items, layout, started}`
 - `POST /api/items` `{room, text}` · `PATCH /api/items/{id}` `{text?, done?, fav?}` · `DELETE /api/items/{id}`
 - `PUT /api/layout/{piece}` `{x, z, r}` · `DELETE /api/layout` (reset)

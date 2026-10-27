@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import Cookie, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
+from fastapi import Cookie, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -166,10 +166,31 @@ class Place(BaseModel):
     r: float
 
 
+# ---------- login throttling: cap wrong guesses so the PIN can't be brute-forced ----------
+FAILS: dict[str, list[float]] = {}
+IP_MAX, IP_WINDOW = 5, 15 * 60          # per device: 5 wrong tries per 15 minutes
+ALL_MAX, ALL_WINDOW = 30, 60 * 60       # everyone together: 30 wrong tries per hour
+
+
+def client_ip(request: Request) -> str:
+    return request.headers.get("fly-client-ip") or (request.client.host if request.client else "?")
+
+
+def recent(key: str, window: int) -> list[float]:
+    now = time.time()
+    FAILS[key] = [t for t in FAILS.get(key, []) if t > now - window]
+    return FAILS[key]
+
+
 # ---------- routes ----------
 @app.post("/api/login")
-def login(body: Login, response: Response):
+def login(body: Login, request: Request, response: Response):
+    ip = client_ip(request)
+    if len(recent(ip, IP_WINDOW)) >= IP_MAX or len(recent("*", ALL_WINDOW)) >= ALL_MAX:
+        raise HTTPException(429, "Too many tries")
     if not hmac.compare_digest(body.password, PASSWORD):
+        FAILS[ip].append(time.time())
+        FAILS["*"].append(time.time())
         raise HTTPException(401, "Wrong password")
     expires = int(time.time()) + COOKIE_DAYS * 86400
     response.set_cookie(COOKIE, sign(str(expires)), max_age=COOKIE_DAYS * 86400,
