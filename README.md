@@ -6,6 +6,9 @@ A 3D plaster house for two. Each room holds a shared list (movies, food, dates, 
 app/
   main.py           FastAPI app: auth, REST API, WebSocket, SQLite
   static/index.html the whole 3D front end (three.js from a CDN)
+model/
+  scene.json        the 3D scene dumped from the page
+  build3dm.py       turns scene.json into a Rhino .3dm
 Dockerfile
 fly.toml.example    Fly.io config, copy it to fly.toml
 ```
@@ -59,6 +62,15 @@ Put Caddy in front for automatic HTTPS (it proxies WebSockets without extra conf
 house.yourdomain.com {
     reverse_proxy 127.0.0.1:8000
 }
+```
+
+## Rhino model
+
+`model/scene.json` is a dump of the page's scene: every box, cylinder and sphere with its transform, colour and layer. Turn it into a `.3dm` with real solids and nested layers:
+
+```bash
+pip install rhino3dm
+python model/build3dm.py model/scene.json model/our-little-house.3dm
 ```
 
 ## Backups
