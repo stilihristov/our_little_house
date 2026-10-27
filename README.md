@@ -6,6 +6,7 @@ A 3D plaster house for two. Each room holds a shared list (movies, food, dates, 
 app/
   main.py           FastAPI app: auth, REST API, WebSocket, SQLite
   static/index.html the whole 3D front end (three.js from a CDN)
+Dockerfile
 ```
 
 ## Run it locally
