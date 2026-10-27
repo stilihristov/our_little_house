@@ -117,7 +117,6 @@ Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8});scene.add(sun
 const mats={};function M(c){return mats[c]||(mats[c]=new THREE.MeshStandardMaterial({color:c,roughness:.92,flatShading:true}))}
 const PL=0xefebe3,PL2=0xdcd5c8,PL3=0xc8c0b1,INK=0x1d1c1a,WOOD=0xa98a63;
 function box(w,h,d,c,x,y,z,p=scene,rx=0,ry=0,rz=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.castShadow=m.receiveShadow=true;p.add(m);return m}
-function prism(r,h,c,x,y,z,p,ry=0,rz=0,sides=3){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,sides),M(c));m.position.set(x,y,z);m.rotation.set(0,ry,rz);m.castShadow=m.receiveShadow=true;p.add(m);return m}
 
 // ground + plinth
 const g=new THREE.Mesh(new THREE.PlaneGeometry(80,80),M(0xd9d3c6));g.rotation.x=-Math.PI/2;g.position.y=-.4;g.receiveShadow=true;scene.add(g);
@@ -136,11 +135,8 @@ ROOMS.forEach(r=>{
 const wallStart=scene.children.length;
 for(let i=0;i<7;i++){const h=1.6+hash("b"+i)*1.8,w=1+hash("bw"+i)*1.4;box(w,h,.12,i%3?PL:PL2,-3.6+i*1.2,h/2,-4.1+hash("bz"+i)*.2,scene,0,(hash("br"+i)-.5)*.35,(hash("bt"+i)-.5)*.25)}
 for(let i=0;i<6;i++){const h=1.2+hash("l"+i)*1.6,w=1+hash("lw"+i)*1.4;box(.12,h,w,i%2?PL:PL2,-4.1+hash("lz"+i)*.2,h/2,3.6-i*1.35,scene,(hash("lt"+i)-.5)*.25,(hash("lr"+i)-.5)*.3,0)}
-// a few colour panels slotted into the walls, Merz-style
 box(.7,1.1,.04,0xb5452f,-1.6,1.4,-3.95,scene,0,.08,-.06);box(.9,.5,.04,0x2f4fa8,1.9,2.1,-3.95,scene,0,-.1,.04);box(.04,.8,.6,0xc9952f,-3.95,1.1,-.8,scene);box(.4,.4,.04,INK,.4,2.6,-3.9,scene,0,0,.3);
-// low dividers between rooms: offset slabs, not full walls
 box(3.2,.7,.1,PL3,-1.9,.35,0,scene,0,.04,0);box(1.6,1.1,.1,PL,2.6,.55+STEP,-.05);box(.1,.9,2.6,PL3,0,.45,2.3);box(.1,1.4,1.8,PL,.05,.7+STEP*2,-2.6);
-// cantilevered roof fragments
 box(3.4,.08,1.6,PL,-2.4,2.9,-3.1,scene,.05,.1,0);box(1.8,.08,2.6,PL2,-3.2,2.4,1.4,scene,0,-.08,.06);
 // the same grotto along the front and right, so whichever sides end up behind always have walls standing
 for(let i=0;i<7;i++){const h=1.6+hash("f"+i)*1.8,w=1+hash("fw"+i)*1.4;box(w,h,.12,i%3?PL2:PL,3.6-i*1.2,h/2,4.1-hash("fz"+i)*.2,scene,0,(hash("fr"+i)-.5)*.35,(hash("ft"+i)-.5)*.25)}
@@ -162,15 +158,12 @@ function piece(id,room,lx,lz,build){const r=ROOMS.find(q=>q.id===room);const p=n
 function setPiece(p,x,z,ry,snap){x=Math.max(-3.7,Math.min(3.7,x));z=Math.max(-3.7,Math.min(3.7,z));const y=roomAt(x,z).y;
   p.userData.t=[x,y,z,ry];if(snap){p.position.set(x,y,z);p.rotation.y=ry}}
 function mesh(geo,c,x,y,z,p,rx=0,ry=0,rz=0){const m=new THREE.Mesh(geo,M(c));m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.castShadow=m.receiveShadow=true;p.add(m);return m}
-// living room
 piece("screen","movies",0,-1.5,p=>{box(1.9,1.1,.06,INK,0,.8,0,p,-.08,.12,0);box(1.5,.8,.03,0x2f4fa8,.05,.82,.06,p,-.08,.12,0)});
 piece("bench","movies",-.1,.9,p=>box(2.2,.28,.6,PL3,0,.22,0,p,0,-.06,0));
 piece("cube","movies",1.3,.6,p=>box(.6,.6,.6,PL2,0,.38,0,p,0,.3,0));
-// kitchen
 piece("counter","food",-.6,-1.4,p=>{box(2.4,.12,.8,PL3,.4,.75,0,p);box(.6,.7,.6,PL2,-.5,.35,0,p)});
 piece("cylinder","food",1.3,-1.2,p=>mesh(new THREE.CylinderGeometry(.32,.32,1.4,24),0xc9952f,0,.7,0,p));
 piece("table","food",-.2,.5,p=>{box(1.2,.08,1.2,WOOD,0,.55,0,p,0,.4,0);box(.12,.5,.12,INK,0,.27,0,p)});
-// bedroom
 piece("stair","dates",-.6,.1,p=>{for(let i=0;i<5;i++)box(.9,.18*(i+1),.4,i%2?PL:PL2,0,.09*(i+1),.8-i*.4,p)});
 piece("sphere","dates",.9,.1,p=>mesh(new THREE.SphereGeometry(.38,20,14),0xb5452f,0,.46,0,p));
 piece("bed","dates",.5,-1.1,p=>box(1.4,.3,1.8,PL,0,.15,0,p,0,-.2,0));
@@ -313,7 +306,6 @@ function render(){updGrowth();if(!cur)return;const ul=$("#list");ul.innerHTML=""
     li.append(c,t,h,d);ul.appendChild(li)})}
 
 $("#f").addEventListener("submit",async e=>{e.preventDefault();const v=$("#newItem").value.trim();if(!v||!cur||!db)return;$("#newItem").value="";
-  const id="i"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   try{await api("POST","/api/items",{room:cur,text:v.slice(0,200)})}catch(err){status("Couldn't save that.")}});
 async function save(id,patch){try{await api("PATCH","/api/items/"+id,patch)}catch(e){status("Couldn't save that change.")}}
 async function remove(id){try{await api("DELETE","/api/items/"+id)}catch(e){status("Couldn't remove that.")}}
