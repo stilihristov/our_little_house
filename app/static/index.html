@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Our Little House</title>
 <style>
-/* Layout: full-screen plaster diorama (WebGL, Merzbau-like stepped volumes) + slide-in room panel. Single committed light look. */
+/* Layout: full-screen plaster diorama (WebGL, cavalier oblique) in black and white, pendant lamp follows the pointer, slide-in room panel. */
 :root{
   --plaster:#e4dfd4; --paper:#f3efe6; --ink:#1d1c1a; --muted:#77716a; --oxide:#b5452f; --line:rgba(29,28,26,.16);
   --display:"Helvetica Neue",Helvetica,Arial,sans-serif; --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
@@ -96,6 +96,15 @@ const lamp=new THREE.PointLight(0xffffff,0,6.5,1.6);lamp.castShadow=true;lamp.sh
 // touch screens have no hover: the lamp rests lit over the house and moves to wherever you tap
 const TOUCH=matchMedia("(hover:none)").matches;
 const lampT=new THREE.Vector3(0,2,0);let lampOn=TOUCH?.8:0;
+// dangling pendant: anchor follows the mouse high up, bulb swings below on a cord
+const anchor=new THREE.Vector3(0,3.4,0),bulbP=new THREE.Vector3(0,2.2,0),bulbV=new THREE.Vector3();const CORD=1.25,HOOK=new THREE.Vector3(0,16,0);
+const upper=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,1,5),new THREE.MeshBasicMaterial({color:0x2a2622}));scene.add(upper);
+const grip=new THREE.Mesh(new THREE.SphereGeometry(.035,10,8),new THREE.MeshBasicMaterial({color:0x111111}));scene.add(grip);
+const cord=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,1,5),new THREE.MeshBasicMaterial({color:0x2a2622}));scene.add(cord);
+const pendant=new THREE.Group();scene.add(pendant);
+const shade=new THREE.Mesh(new THREE.ConeGeometry(.22,.2,24,1,true),new THREE.MeshStandardMaterial({color:0x2b2724,roughness:.6,side:THREE.DoubleSide}));shade.position.y=.06;pendant.add(shade);
+const bulb=new THREE.Mesh(new THREE.SphereGeometry(.07,16,12),new THREE.MeshBasicMaterial({color:0xffd9a0}));bulb.position.y=-.03;pendant.add(bulb);
+const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');const gr=x.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,200,130,.9)');gr.addColorStop(1,'rgba(255,160,80,0)');x.fillStyle=gr;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)})(),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));halo.scale.set(.9,.9,1);halo.position.y=-.03;pendant.add(halo);
 const sun=new THREE.DirectionalLight(0xc8d0ff,.1);sun.position.set(-7,11,5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0006;
 Object.assign(sun.shadow.camera,{left:-8,right:8,top:8,bottom:-8});scene.add(sun);
 
@@ -224,10 +233,16 @@ addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)return closeRoom();
 canvas.addEventListener("wheel",e=>{tDist=Math.min(20,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
 let hov=null;
 function hover(e){const r=roomUnder(e);hov=r;canvas.style.cursor="none";
-  aim(e);plane.constant=-2;if(ray.ray.intersectPlane(plane,hit)){lampT.set(hit.x,2,hit.z)}plane.constant=0;lampOn=r?1:TOUCH?.8:.35;}
+  aim(e);plane.constant=-3.4;if(ray.ray.intersectPlane(plane,hit)){anchor.set(hit.x,3.4,hit.z)}plane.constant=0;lampOn=r?1:TOUCH?.8:.35;}
 function loop(t){
   thetaV+=(tTheta-theta)*.014;thetaV*=.84;theta+=thetaV;
   target.lerp(tTarget,.08);dist+=(tDist-dist)*.08;place();
+  {const rest=anchor.clone();rest.y-=CORD;bulbV.addScaledVector(rest.sub(bulbP),.035);bulbV.multiplyScalar(.9);bulbP.add(bulbV);
+   const d=bulbP.clone().sub(anchor).setLength(CORD);bulbP.copy(anchor).add(d);
+   cord.position.copy(anchor).add(bulbP).multiplyScalar(.5);cord.scale.y=CORD;cord.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),anchor.clone().sub(bulbP).normalize());
+   {const top=HOOK.clone();top.x=anchor.x*.25;top.z=anchor.z*.25;const L=top.distanceTo(anchor);upper.position.copy(top).add(anchor).multiplyScalar(.5);upper.scale.y=L;upper.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),top.sub(anchor).normalize());grip.position.copy(anchor);upper.visible=grip.visible=!cur}
+   pendant.position.copy(bulbP);pendant.quaternion.copy(cord.quaternion);lampT.copy(bulbP);lampT.y-=.1;
+   pendant.visible=cord.visible=!cur;halo.material.opacity=.4+lampOn*.6}
   lamp.position.copy(lampT);lamp.intensity+=((cur?0:lampOn*2.2)-lamp.intensity)*.12;
   ROOMS.forEach(r=>{const on=cur===r.id,h=hov===r;r.glow.intensity+=((on?1.1:h?.6:0)-r.glow.intensity)*.1;
     r.spire.children.forEach(m=>{if(m.userData.grow){const s=m.scale.x+(1-m.scale.x)*.08;m.scale.setScalar(s);if(s>.99)m.userData.grow=0}})});
