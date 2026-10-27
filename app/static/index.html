@@ -192,6 +192,89 @@ function growShards(done){const key=done.map(i=>i.id).join();if(key===shardKey)r
     t.position.set(x,.12,z);t.rotation.set(hash(i.id+"a")*3,hash(i.id+"b")*3,0);t.castShadow=true;Object.assign(t.userData,{id:i.id,bx:x,bz:z,wx:2+x,wz:-2+z,mass:1.6,spin:t.rotation.y});
     if(!had.has(i.id)){t.scale.setScalar(.001);t.userData.grow=1}shardG.add(t)})}
 
+/* ---------- the paper dachshund ----------
+   One still kraft-paper cut-out (ink outline, cut-paper rim, hatching) moved around like a paper puppet: it rocks and
+   hops as it goes and spins the whole card round when it changes direction. Stands upright facing the camera, wanders
+   between free spots, hops up the terraces, gets jostled by the turning, and says "Meow!" now and then or when tapped.
+   Spawns somewhere new on every load. */
+const DOG=(()=>{
+  const FW=256,FH=160,NF=1,KRAFT="#c09468",KRAFT_D="#8f6a46",INK="#1b1814",RIM="#fbf8f1";
+  const cv=document.createElement("canvas");cv.width=FW*NF;cv.height=FH;const c=cv.getContext("2d");
+  const rng=s=>()=>(s=s*16807%2147483647)/2147483647;
+  // wobbly ellipse: jittered points joined by smooth quadratic curves
+  function blob(R,cx,cy,rx,ry,rot=0,j=1.4,n=20){const pts=[],cr=Math.cos(rot),sr=Math.sin(rot);
+    for(let i=0;i<n;i++){const a=i/n*Math.PI*2,k=1+(R()-.5)*.07*j,x=Math.cos(a)*rx*k,y=Math.sin(a)*ry*k;pts.push([cx+x*cr-y*sr+(R()-.5)*j,cy+x*sr+y*cr+(R()-.5)*j])}
+    const mid=(p,q)=>[(p[0]+q[0])/2,(p[1]+q[1])/2];const s=mid(pts[n-1],pts[0]);c.moveTo(s[0],s[1]);
+    for(let i=0;i<n;i++){const p=pts[i],q=mid(p,pts[(i+1)%n]);c.quadraticCurveTo(p[0],p[1],q[0],q[1])}c.closePath()}
+  function frame(f){const R=rng(9001+f*131),walk=f<4,p=walk?f/4*Math.PI*2:0,bob=walk?-Math.abs(Math.sin(p))*2.5:0;
+    const wag=walk?Math.sin(p*2)*.22:(f===4?.38:-.12);
+    const leg=(x,ph)=>{const s=walk?Math.sin(p+ph)*7:0,l=walk?Math.max(0,Math.cos(p+ph))*4:0;return [[x+s,120-l,7.5,17,s*.025],[x+s+3,136-l,9.5,4.5,0]]};
+    const tail=[[45,69+bob,21,4.5,.57+wag]];  // base tucked into the rump, tip up and back
+    const far=[...leg(74,Math.PI),...leg(158,0)],near=[...leg(88,0),...leg(172,Math.PI)];
+    const body=[[118,92+bob,70,23,0],[163,97+bob,27,23,0],[183,80+bob,15,20,-.5]];
+    const head=[[201,63+bob,20,16.5,0],[225,71+bob,18,8.5,.15]],ear=[[193,74+bob,8.5,16,.32]];
+    const groups=[[tail,KRAFT],[far,KRAFT_D],[body,KRAFT],[near,KRAFT],[head,KRAFT],[ear,KRAFT_D]];
+    c.save();c.lineJoin=c.lineCap="round";
+    // 1. cut-paper rim around the whole silhouette
+    c.beginPath();groups.forEach(([g])=>g.forEach(e=>blob(R,...e)));c.fillStyle=c.strokeStyle=RIM;c.lineWidth=13;c.stroke();c.fill();
+    // 2. each part: thick ink stroke first, then fill on top, so only the outer outline of a group survives
+    groups.forEach(([g,col])=>{c.beginPath();g.forEach(e=>blob(R,...e,1.6));c.strokeStyle=INK;c.lineWidth=6.5;c.stroke();c.fillStyle=col;c.fill();
+      // hatching along the underside of each part, clipped to it
+      c.save();c.clip();c.strokeStyle="rgba(27,24,20,.45)";c.lineWidth=1.3;const top=Math.min(...g.map(e=>e[1]+e[3]*.25));
+      for(let x=0;x<FW;x+=5){c.beginPath();c.moveTo(x+(R()-.5)*2,top+12);c.lineTo(x-14+(R()-.5)*2,top+40);c.stroke()}
+      // paper fibres
+      c.strokeStyle="rgba(255,240,215,.35)";c.lineWidth=1;for(let i=0;i<40;i++){const x=R()*FW,y=R()*FH,a=R()*3;c.beginPath();c.moveTo(x,y);c.lineTo(x+Math.cos(a)*5,y+Math.sin(a)*5);c.stroke()}
+      c.restore()});
+    // 3. details: fold crease, collar, eye, nose, mouth
+    c.strokeStyle="rgba(255,245,225,.5)";c.lineWidth=1.5;c.setLineDash([5,4]);c.beginPath();c.moveTo(120,70+bob);c.quadraticCurveTo(123,92+bob,119,114+bob);c.stroke();c.setLineDash([]);
+    c.strokeStyle=INK;c.lineWidth=5;c.beginPath();c.moveTo(173,70+bob);c.quadraticCurveTo(181,86+bob,192,93+bob);c.stroke();
+    c.fillStyle=RIM;c.beginPath();c.arc(186,95+bob,3.4,0,7);c.fill();c.lineWidth=1.6;c.stroke();
+    c.fillStyle=INK;c.beginPath();c.arc(208+(R()-.5),58+bob,3.6,0,7);c.fill();c.fillStyle=RIM;c.beginPath();c.arc(209.3,56.8+bob,1.1,0,7);c.fill();
+    c.fillStyle=INK;blob(R,241,68+bob,5,4.2,0,.6,10);c.fill();
+    c.lineWidth=2;c.beginPath();c.moveTo(230,77+bob);c.quadraticCurveTo(222,80+bob,214,77+bob);c.stroke();
+    c.restore()}
+  frame(4);  // the standing pose, tail up
+  const tex=new THREE.CanvasTexture(cv);tex.minFilter=THREE.LinearFilter;tex.generateMipmaps=false;tex.repeat.set(1/NF,1);
+  const W=1,H=W*FH/FW,geo=new THREE.PlaneGeometry(W,H);geo.translate(0,H/2-W*(FH-140)/FW,0); // origin at the paws
+  const mat=new THREE.MeshLambertMaterial({map:tex,alphaTest:.5,side:THREE.DoubleSide,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:.28});
+  const card=new THREE.Mesh(geo,mat);scene.add(card);
+  const sc=document.createElement("canvas");sc.width=sc.height=64;{const x=sc.getContext("2d"),gr=x.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,"rgba(0,0,0,.55)");gr.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=gr;x.fillRect(0,0,64,64)}
+  const blobShadow=new THREE.Mesh(new THREE.PlaneGeometry(.95,.38),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc),transparent:true,depthWrite:false}));blobShadow.rotation.x=-Math.PI/2;scene.add(blobShadow);
+  // obstacles: furniture (re-measured when choosing a walk, since pieces can be moved) and the low dividers
+  const dividers=scene.children.slice(wallStart).filter(m=>m.isMesh&&!walls.includes(m)&&m!==card&&m!==blobShadow),bx=new THREE.Box3();
+  function blocked(x,z){if(Math.abs(x)>3.5||Math.abs(z)>3.5)return true;
+    return [...PIECES,...dividers].some(o=>{bx.setFromObject(o);return x>bx.min.x-.3&&x<bx.max.x+.3&&z>bx.min.z-.3&&z<bx.max.z+.3})}
+  function clearPath(a,b){const n=Math.ceil(a.distanceTo(b)/.15);for(let i=1;i<=n;i++){const k=i/n;if(blocked(a.x+(b.x-a.x)*k,a.z+(b.z-a.z)*k))return false}return true}
+  const pos=new THREE.Vector3(),goal=new THREE.Vector3(),u={mass:1.8};let state="idle",timer=1,facing=1,flip=1,walkPh=0,last=0,hopFrom=0,hopT=1,jumpT=1;
+  const FLOOR=.08;  // room floors sit .08 above their terrace level
+  for(let i=0;i<200;i++){pos.set((Math.random()-.5)*7,0,(Math.random()-.5)*7);if(!blocked(pos.x,pos.z))break}
+  pos.y=roomAt(pos.x,pos.z).y+FLOOR;
+  function pickGoal(){for(let i=0;i<30;i++){const a=Math.random()*6.28,d=.8+Math.random()*2.4;goal.set(pos.x+Math.cos(a)*d,0,pos.z+Math.sin(a)*d);
+      if(!blocked(goal.x,goal.z)&&clearPath(pos,goal)){state="walk";return}}state="idle";timer=1+Math.random()*2}
+  function update(t){const dt=Math.max(0,Math.min(.05,(t-(last||t))/1000));last=t;
+    if(state==="idle"){timer-=dt;if(timer<=0)pickGoal()}
+    else{const d=goal.clone().sub(pos);d.y=0;const L=d.length(),step=.55*dt;
+      if(L<=step){pos.x=goal.x;pos.z=goal.z;state="idle";timer=1.5+Math.random()*3}
+      else{d.multiplyScalar(1/L);pos.x+=d.x*step;pos.z+=d.z*step;
+        const sx=d.x*Math.cos(theta)-d.z*Math.sin(theta);if(Math.abs(sx)>.08)facing=sx>0?1:-1}}
+    // step up/down the terraces with a little hop
+    const ty=roomAt(pos.x,pos.z).y+FLOOR;if(Math.abs(ty-pos.y)>.01&&hopT>=1){hopFrom=pos.y;hopT=0}
+    if(hopT<1){hopT=Math.min(1,hopT+dt*3.5);pos.y=hopFrom+(ty-hopFrom)*hopT}else pos.y=ty;
+    // paper-puppet motion: rock and step while moving, spin the card round when turning
+    if(state==="walk")walkPh+=dt*11;else walkPh+=(Math.round(walkPh/Math.PI)*Math.PI-walkPh)*Math.min(1,dt*8);
+    flip+=(facing-flip)*Math.min(1,dt*9);
+    if(jumpT<1)jumpT=Math.min(1,jumpT+dt*2.2);
+    sway(u,pos.x,pos.z);
+    const hop=hopT<1?Math.sin(hopT*Math.PI)*.18:0,jump=jumpT<1?Math.sin(jumpT*Math.PI)*.35:0,lift=Math.abs(Math.sin(walkPh))*.07;
+    card.position.set(pos.x+u.ox,pos.y+hop+jump+lift,pos.z+u.oz);
+    card.rotation.set(0,theta,0);card.scale.x=flip;  // upright, facing the camera
+    card.rotateZ(Math.sin(walkPh)*.13+clampT(-(u.vx*Math.cos(theta)-u.vz*Math.sin(theta))*3));
+    blobShadow.position.set(pos.x+u.ox,pos.y+.01,pos.z+u.oz);blobShadow.rotation.z=theta;blobShadow.material.opacity=Math.max(.15,1-(hop+jump+lift)*2.5);}
+  // tapping or clicking the dog makes it hop
+  update.poke=e=>{aim(e);if(!ray.intersectObject(card).length)return false;jumpT=0;return true};
+  return update;
+})();
+
 function updGrowth(){const days=started?Math.max(0,(Date.now()-started)/864e5):0;
   colVisible=Math.min(colSegs.length,3+Math.floor(Math.sqrt(days)*2.2));
   ROOMS.forEach(r=>buildSpire(r,items.filter(i=>i.room===r.id&&i.done).length));
@@ -237,11 +320,11 @@ canvas.addEventListener("pointermove",e=>{
 canvas.addEventListener("pointerleave",e=>{hov=null;if(e.pointerType==="mouse")lampOn=0});
 canvas.addEventListener("pointerup",e=>{
   if(e.pointerType==="mouse"){drag=null;
-    if(moved<6&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)enterRoom(r);else if(!r&&cur)closeRoom()}
+    if(moved<6&&!anim){if(DOG.poke(e))return;const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)enterRoom(r);else if(!r&&cur)closeRoom()}
     else if(moved>=6)snapTurn();return}
   if(!touches.delete(e.pointerId))return;
   if(twoFinger){if(!touches.size){snapTurn();twoFinger=false}return}
-  if(moved<10&&!anim){const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)enterRoom(r);else if(!r&&cur)closeRoom()}});
+  if(moved<10&&!anim){if(DOG.poke(e))return;const r=roomUnder(e)||pick(e);if(r&&r.id!==cur)enterRoom(r);else if(!r&&cur)closeRoom()}});
 canvas.addEventListener("pointercancel",e=>{touches.delete(e.pointerId);if(!touches.size&&twoFinger){snapTurn();twoFinger=false}});
 function turn(d){tTheta=Math.round(tTheta/TURN)*TURN+d*TURN}
 addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)return closeRoom();
@@ -297,6 +380,7 @@ function loop(t){
   column.rotation.y=Math.sin(t*.0002)*.05;
   shardG.children.forEach(c=>{const u=c.userData;sway(u,u.wx,u.wz);c.position.x=u.bx+u.ox;c.position.z=u.bz+u.oz;c.rotation.y=u.spin+u.ox*4;
     if(u.grow){const s=c.scale.x+(1-c.scale.x)*.06;c.scale.setScalar(s);if(s>.99)c.userData.grow=0}});
+  DOG(t);
   renderer.render(scene,camera);requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
