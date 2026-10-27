@@ -16,13 +16,13 @@ pip install -r requirements.txt
 HOUSE_PASSWORD=1234 uvicorn app.main:app --reload
 ```
 
-Open http://localhost:8000 and enter the password. The database is created at `data/house.db` on first start, seeded with the movie list, and today is saved as day 1.
+Open http://localhost:8000 and enter the PIN. The database is created at `data/house.db` on first start, seeded with the movie list, and today is saved as day 1.
 
 ## Settings (environment variables)
 
 | Variable | What it does | Default |
 |---|---|---|
-| `HOUSE_PASSWORD` | Shared password for both of you | `change-me` |
+| `HOUSE_PASSWORD` | The shared 4-digit PIN for both of you | `change-me` |
 | `HOUSE_SECRET` | Signs the login cookie. Set it, or everyone is logged out on every restart | random each start |
 | `HOUSE_DB` | Path to the SQLite file | `data/house.db` |
 | `HOUSE_HTTPS` | Set to `1` behind HTTPS so the cookie is marked secure | off |

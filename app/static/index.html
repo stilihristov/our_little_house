@@ -60,17 +60,25 @@ body.inroom #status{display:none}
 #vign{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(0,0,0,.75) 100%)}
 #veil{position:fixed;inset:0;pointer-events:none;filter:grayscale(1);opacity:0;transition:opacity .9s ease}
 #veil.on{opacity:1;background:radial-gradient(circle at var(--vx,50%) var(--vy,50%),rgba(255,196,130,.35) 0,rgba(255,160,80,.12) 35%,rgba(10,8,6,0) 75%)}
-.login{position:fixed;inset:0;background:rgba(228,223,212,.86);backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px}
-.login form{background:var(--paper);border:1px solid var(--ink);padding:24px;display:grid;gap:10px;width:min(340px,100%)}
-.login h2{font-family:var(--display);font-weight:400;font-size:34px;margin:0 0 6px}.login h2 em{color:var(--oxide)}
-.login label{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}.login input{border-right:1px solid var(--ink)}
-.login p{margin:0;color:var(--oxide);font-size:13px;min-height:1em}
+
+/* PIN gate: 4-digit input, curtains that open on success */
+#gate{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;gap:28px;align-items:center;justify-content:center;transition:opacity .6s ease}
+#gate.gone{opacity:0;pointer-events:none}
+#gf{display:flex;border-bottom:1px solid #e8e8e8;padding:0;margin:0}
+#pin{background:none;border:0;color:#f0f0f0;font:28px var(--display);letter-spacing:.6em;text-align:center;width:7em;padding:8px 0 8px .6em;outline:none}
+#pin::placeholder{color:#444}
+#gf button{background:none;border:0;color:#e8e8e8;font-size:22px;padding:0 6px}
+#gf.no{animation:shake .4s}@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+#gmsg{color:#888;font-size:12px;min-height:1.2em;margin:-14px 0 0;letter-spacing:.04em}
 @media (prefers-reduced-motion:reduce){#panel{transition:none}}
 </style>
 </head>
 <body>
 
 <canvas id="scene" aria-label="An abstract plaster house with four rooms"></canvas>
+<div id="gate"><form id="gf" autocomplete="off"><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" aria-label="PIN" placeholder="••••" autofocus><button aria-label="Enter">→</button></form>
+<p id="gmsg" role="alert"></p>
+</div>
 <div id="veil"></div><div id="vign"></div><div id="grain"></div>
 <aside id="panel" aria-hidden="true">
   <div class="ph"><div><small id="pk"></small><h2 id="pt"></h2><p id="pd"></p></div><button class="x" id="close" aria-label="Back to the house">×</button></div>
@@ -81,7 +89,6 @@ body.inroom #status{display:none}
 <p id="status"></p>
 <div id="meow" aria-hidden="true">Meow!</div>
 
-<div id="login" class="login" hidden><form id="loginForm"><h2>Our <em>little</em> house</h2><label for="pw">House password</label><input id="pw" type="password" autocomplete="current-password" required><button class="solid">Come in</button><p id="loginErr" role="alert"></p></form></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const ROOMS=[
@@ -280,7 +287,7 @@ const DOG=(()=>{
     card.rotateZ(Math.sin(walkPh)*.13+clampT(-(u.vx*Math.cos(theta)-u.vz*Math.sin(theta))*3));
     blobShadow.position.set(pos.x+u.ox,pos.y+.01,pos.z+u.oz);blobShadow.rotation.z=theta;blobShadow.material.opacity=Math.max(.15,1-(hop+jump+lift)*2.5);
     // "Meow!" now and then, above its head
-    if((nextMeow-=dt)<=0){meow();nextMeow=9+Math.random()*16}
+    if(unlocked&&(nextMeow-=dt)<=0){meow();nextMeow=9+Math.random()*16}
     if(meowT>0){meowT-=dt;if(meowT<=0)bubble.classList.remove("on");
       const v=card.position.clone();v.y+=H*1.15;v.addScaledVector(new THREE.Vector3(Math.cos(theta),0,-Math.sin(theta)),facing*W*.3).project(camera);
       bubble.style.left=(v.x*.5+.5)*innerWidth+"px";bubble.style.top=(-v.y*.5+.5)*innerHeight+"px"}}
@@ -343,7 +350,7 @@ canvas.addEventListener("pointerup",e=>{
 canvas.addEventListener("pointercancel",e=>{touches.delete(e.pointerId);if(!touches.size&&twoFinger){snapTurn();twoFinger=false}});
 function turn(d){tTheta=Math.round(tTheta/TURN)*TURN+d*TURN}
 addEventListener("keydown",e=>{if(e.key==="Escape"&&cur)return closeRoom();
-  if(e.target.closest&&e.target.closest("input,textarea")||e.metaKey||e.ctrlKey||e.altKey)return;
+  if(e.target.closest&&e.target.closest("input,textarea")||e.metaKey||e.ctrlKey||e.altKey||!unlocked)return;
   const k=e.key.toLowerCase();if(k==="q")turn(-1);else if(k==="e")turn(1)});
 canvas.addEventListener("wheel",e=>{tDist=Math.min(20,Math.max(5,tDist+e.deltaY*.01))},{passive:true});
 let hov=null;
@@ -410,7 +417,7 @@ document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.
 function render(){updGrowth();if(!cur)return;const ul=$("#list");ul.innerHTML="";
   let rows=items.filter(i=>i.room===cur&&(filter==="all"||(filter==="done")===!!i.done));
   rows.sort((a,b)=>(b.fav?1:0)-(a.fav?1:0)||(b.ts||0)-(a.ts||0));
-  if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=db?(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above."):"Sign in to see your lists.";ul.appendChild(e);return}
+  if(!rows.length){const e=document.createElement("li");e.className="empty";e.textContent=db?(filter==="done"?"Nothing ticked off yet. Each one you finish adds a block to this room.":"Empty for now. Add the first one above."):"Connecting…";ul.appendChild(e);return}
   rows.forEach(i=>{const li=document.createElement("li");if(i.done)li.className="done";
     const c=document.createElement("button");c.className="chk";c.textContent=i.done?"✓":"";c.setAttribute("aria-label",i.done?"Mark as not done":"Mark as done");c.onclick=()=>save(i.id,{done:!i.done,doneAt:i.done?null:Date.now()});
     const t=document.createElement("span");t.className="t";t.textContent=i.text;
@@ -425,9 +432,26 @@ async function remove(id){try{await api("DELETE","/api/items/"+id)}catch(e){stat
 function status(s){$("#status").textContent=s}
 updGrowth();
 
+/* ---------- PIN gate: the server checks the PIN and sets a login cookie ---------- */
+let unlocked=false;
+function unlock(){if(unlocked)return;unlocked=true;$("#gate").classList.add("gone");document.body.classList.add("open");
+  setTimeout(()=>{if(unlocked)document.querySelectorAll(".curt").forEach(c=>c.style.display="none")},2700)}
+function relock(){unlocked=false;document.querySelectorAll(".curt").forEach(c=>c.style.display="");document.body.classList.remove("open");$("#gate").classList.remove("gone");$("#pin").value="";$("#pin").focus()}
+function shake(msg){const f=$("#gf");f.classList.remove("no");void f.offsetWidth;f.classList.add("no");$("#pin").value="";$("#gmsg").textContent=msg||""}
+let checking=false;
+async function check(){const v=$("#pin").value;if(checking)return;if(v.length!==4)return shake();checking=true;
+  try{const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:v})});
+    if(r.ok){$("#gmsg").textContent="";$("#pin").value="";unlock();connect()}
+    else if(r.status===429)shake("Too many tries. Wait a few minutes.");
+    else shake()}
+  catch(e){shake("Can't reach the house right now.")}
+  finally{checking=false}}
+$("#gf").addEventListener("submit",e=>{e.preventDefault();check()});
+$("#pin").addEventListener("input",()=>{$("#pin").value=$("#pin").value.replace(/\D/g,"");if($("#pin").value.length===4)check()});
+
 /* ---------- server sync: REST for writes, one WebSocket for live state ---------- */
 async function api(method,url,body){const r=await fetch(url,{method,headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,credentials:"same-origin"});
-  if(r.status===401){showLogin();throw new Error("auth")}if(!r.ok)throw new Error(r.status);return r.status===204?null:r.json()}
+  if(r.status===401){relock();throw new Error("auth")}if(!r.ok)throw new Error(r.status);return r.status===204?null:r.json()}
 function applyState(st){items=st.items||[];started=st.started||null;const seen=new Set();
   (st.layout||[]).forEach(v=>{const p=pieceById[v.piece];if(!p)return;seen.add(v.piece);setPiece(p,+v.x||0,+v.z||0,+v.r||0)});
   PIECES.forEach(p=>{if(!seen.has(p.userData.piece)){const h=p.userData.home;setPiece(p,h[0],h[1],0)}});render()}
@@ -435,11 +459,9 @@ let ws=null,retry=1000;
 function connect(){ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
   ws.onopen=()=>{retry=1000;db=true;status("")};
   ws.onmessage=e=>{try{applyState(JSON.parse(e.data))}catch(err){}};
-  ws.onclose=ev=>{db=null;if(ev.code===4401){showLogin();return}status("Reconnecting…");setTimeout(connect,retry);retry=Math.min(retry*2,15000)}}
-function showLogin(){$("#login").hidden=false;$("#pw").focus()}
-$("#loginForm").addEventListener("submit",async e=>{e.preventDefault();const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:$("#pw").value})});
-  if(r.ok){$("#login").hidden=true;$("#pw").value="";$("#loginErr").textContent="";connect()}else $("#loginErr").textContent="That password didn't work."});
-fetch("/api/me").then(r=>{if(r.ok)connect();else{status("");showLogin()}}).catch(()=>status("Can't reach the server."));
+  ws.onclose=ev=>{db=null;ws=null;if(ev.code===4401){relock();return}status("Reconnecting…");setTimeout(connect,retry);retry=Math.min(retry*2,15000)}}
+// already signed in on this device? skip straight to the open curtains
+fetch("/api/me").then(r=>{if(r.ok){unlock();connect()}}).catch(()=>{});
 </script>
 </body>
 </html>
