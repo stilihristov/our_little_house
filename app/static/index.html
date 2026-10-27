@@ -48,6 +48,12 @@ li.done .chk{background:var(--oxide);border-color:var(--oxide)}
 .empty{color:var(--muted);padding:20px 0;font-size:14px}
 #status{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));color:#999;font-size:12px;max-width:70%;z-index:4;margin:0}
 body.inroom #status{display:none}
+/* the dog's speech bubble: cut paper with an ink border, pops in with a little overshoot */
+#meow{position:fixed;left:-99px;top:0;z-index:3;pointer-events:none;transform:translate(-50%,-100%) scale(0) rotate(-5deg);transform-origin:50% 100%;
+  background:#fbf8f1;color:#1b1814;border:2.5px solid #1b1814;border-radius:16px 13px 17px 12px;padding:5px 11px 4px;font:700 15px var(--display);
+  box-shadow:3px 3px 0 rgba(0,0,0,.35);transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+#meow.on{transform:translate(-50%,-100%) scale(1) rotate(-5deg)}
+#meow::after{content:"";position:absolute;left:calc(50% - 7px);bottom:-8px;width:11px;height:11px;background:#fbf8f1;border-right:2.5px solid #1b1814;border-bottom:2.5px solid #1b1814;transform:rotate(45deg)}
 
 #grain{position:fixed;inset:0;pointer-events:none;opacity:.09;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 #vign{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(0,0,0,.75) 100%)}
@@ -72,6 +78,7 @@ body.inroom #status{display:none}
   <ul id="list"></ul>
 </aside>
 <p id="status"></p>
+<div id="meow" aria-hidden="true">Meow!</div>
 
 <div id="login" class="login" hidden><form id="loginForm"><h2>Our <em>little</em> house</h2><label for="pw">House password</label><input id="pw" type="password" autocomplete="current-password" required><button class="solid">Come in</button><p id="loginErr" role="alert"></p></form></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -245,8 +252,9 @@ const DOG=(()=>{
   function blocked(x,z){if(Math.abs(x)>3.5||Math.abs(z)>3.5)return true;
     return [...PIECES,...dividers].some(o=>{bx.setFromObject(o);return x>bx.min.x-.3&&x<bx.max.x+.3&&z>bx.min.z-.3&&z<bx.max.z+.3})}
   function clearPath(a,b){const n=Math.ceil(a.distanceTo(b)/.15);for(let i=1;i<=n;i++){const k=i/n;if(blocked(a.x+(b.x-a.x)*k,a.z+(b.z-a.z)*k))return false}return true}
-  const pos=new THREE.Vector3(),goal=new THREE.Vector3(),u={mass:1.8};let state="idle",timer=1,facing=1,flip=1,walkPh=0,last=0,hopFrom=0,hopT=1,jumpT=1;
+  const pos=new THREE.Vector3(),goal=new THREE.Vector3(),u={mass:1.8};let state="idle",timer=1,facing=1,flip=1,walkPh=0,last=0,hopFrom=0,hopT=1,jumpT=1,meowT=0,nextMeow=4+Math.random()*8;
   const FLOOR=.08;  // room floors sit .08 above their terrace level
+  const bubble=$("#meow");
   for(let i=0;i<200;i++){pos.set((Math.random()-.5)*7,0,(Math.random()-.5)*7);if(!blocked(pos.x,pos.z))break}
   pos.y=roomAt(pos.x,pos.z).y+FLOOR;
   function pickGoal(){for(let i=0;i<30;i++){const a=Math.random()*6.28,d=.8+Math.random()*2.4;goal.set(pos.x+Math.cos(a)*d,0,pos.z+Math.sin(a)*d);
@@ -269,9 +277,15 @@ const DOG=(()=>{
     card.position.set(pos.x+u.ox,pos.y+hop+jump+lift,pos.z+u.oz);
     card.rotation.set(0,theta,0);card.scale.x=flip;  // upright, facing the camera
     card.rotateZ(Math.sin(walkPh)*.13+clampT(-(u.vx*Math.cos(theta)-u.vz*Math.sin(theta))*3));
-    blobShadow.position.set(pos.x+u.ox,pos.y+.01,pos.z+u.oz);blobShadow.rotation.z=theta;blobShadow.material.opacity=Math.max(.15,1-(hop+jump+lift)*2.5);}
-  // tapping or clicking the dog makes it hop
-  update.poke=e=>{aim(e);if(!ray.intersectObject(card).length)return false;jumpT=0;return true};
+    blobShadow.position.set(pos.x+u.ox,pos.y+.01,pos.z+u.oz);blobShadow.rotation.z=theta;blobShadow.material.opacity=Math.max(.15,1-(hop+jump+lift)*2.5);
+    // "Meow!" now and then, above its head
+    if((nextMeow-=dt)<=0){meow();nextMeow=9+Math.random()*16}
+    if(meowT>0){meowT-=dt;if(meowT<=0)bubble.classList.remove("on");
+      const v=card.position.clone();v.y+=H*1.15;v.addScaledVector(new THREE.Vector3(Math.cos(theta),0,-Math.sin(theta)),facing*W*.3).project(camera);
+      bubble.style.left=(v.x*.5+.5)*innerWidth+"px";bubble.style.top=(-v.y*.5+.5)*innerHeight+"px"}}
+  function meow(){meowT=1.8;bubble.classList.remove("on");void bubble.offsetWidth;bubble.classList.add("on")}
+  // tapping or clicking the dog: a hop and a meow
+  update.poke=e=>{aim(e);if(!ray.intersectObject(card).length)return false;jumpT=0;meow();return true};
   return update;
 })();
 
