@@ -27,7 +27,7 @@ Open http://localhost:8000 and enter the PIN. The database is created at `data/h
 
 | Variable | What it does | Default |
 |---|---|---|
-| `HOUSE_PASSWORD` | The shared 4-digit PIN for both of you | `change-me` |
+| `HOUSE_PASSWORD` | The shared 4-digit PIN for both of you. The app won't start without it | required |
 | `HOUSE_SECRET` | Signs the login cookie. Set it, or everyone is logged out on every restart | random each start |
 | `HOUSE_DB` | Path to the SQLite file | `data/house.db` |
 | `HOUSE_HTTPS` | Set to `1` behind HTTPS so the cookie is marked secure | off |

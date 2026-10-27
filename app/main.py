@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 DB_PATH = Path(os.environ.get("HOUSE_DB", "data/house.db"))
-PASSWORD = os.environ.get("HOUSE_PASSWORD", "change-me")
+PASSWORD = os.environ.get("HOUSE_PASSWORD", "")  # required: the app refuses to start without it
 SECRET = os.environ.get("HOUSE_SECRET") or secrets.token_hex(32)  # set it in production so logins survive restarts
 ON_FLY = bool(os.environ.get("FLY_APP_NAME"))  # Fly sets this on its machines
 COOKIE = "house_session"
@@ -137,6 +137,8 @@ hub = Hub()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if not PASSWORD:
+        raise RuntimeError("Set HOUSE_PASSWORD before starting the app")
     init_db()
     yield
 
